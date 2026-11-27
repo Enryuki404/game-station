@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT || process.env.SERVER_PORT) || 3001;
 const MAX_PLAYERS = {
   chess: 2,
   carrom: 2,
@@ -404,6 +404,6 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Game Station Socket.IO server listening on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Game Station Socket.IO server listening on http://0.0.0.0:${PORT}`);
 });
