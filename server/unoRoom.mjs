@@ -98,7 +98,7 @@ export function startUnoMatch(room, fillBots) {
   }
 
   const deck = createUnoDeck();
-  const botNames = ['Bot Raka', 'Bot Sinta', 'Bot Budi'];
+  const botNames = ['Bot Raka', 'Bot Sinta', 'Bot Budi', 'Bot Dewi', 'Bot Dimas'];
   const players = room.players.map((p, idx) => ({
     id: p.id,
     name: p.name,

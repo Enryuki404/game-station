@@ -25,7 +25,7 @@ const MAX_PLAYERS = {
   chess: 2,
   carrom: 2,
   billiard: 2,
-  uno: 4,
+  uno: 6,
 };
 
 const app = express();

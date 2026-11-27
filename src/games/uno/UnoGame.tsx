@@ -583,7 +583,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
       }
       rules={[
         'Mainkan kartu yang memiliki warna, angka, atau simbol yang sama dengan kartu teratas di meja.',
-        'Mode Online (Mabar): Setiap pemain hanya melihat kartu tangannya sendiri di bawah, sedangkan kartu lawan tertutup (anti-intip di server).',
+        'Mode Online P2P (2–6 Pemain): Setiap pemain hanya melihat kartu tangannya sendiri di bawah, sedangkan kartu lawan tertutup (anti-intip).',
         'Saat tersisa 2 kartu sebelum giliranmu berakhir ke 1 kartu, tekan tombol "UNO!" dulu agar tidak kena penalti +2 kartu!',
         'Menang memberi hadiah +500 Chip.',
       ]}
@@ -593,7 +593,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
         <div className="max-w-lg mx-auto rounded-3xl border border-slate-800 bg-slate-900/80 p-6 space-y-5 text-center shadow-2xl">
           {!onlineSession ? (
             <div className="space-y-4">
-              <h2 className="text-xl font-extrabold text-white">Mabar UNO Online (2–4 Pemain)</h2>
+              <h2 className="text-xl font-extrabold text-white">Mabar UNO Online (2–6 Pemain)</h2>
               <p className="text-sm text-slate-300">
                 Buat room untuk mendapatkan kode &amp; link invite, atau gabung ke room temanmu.
               </p>
@@ -616,7 +616,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 space-y-2 text-left">
                 <p className="text-xs font-semibold text-slate-400">
-                  Pemain di Ruang Tunggu ({onlineSession.room.players.length}/4):
+                  Pemain di Ruang Tunggu ({onlineSession.room.players.length}/{onlineSession.room.maxPlayers}):
                 </p>
                 {onlineSession.room.players.map((p) => (
                   <div key={p.id} className="flex items-center justify-between rounded-xl bg-slate-900 px-3 py-2 text-xs">
@@ -639,7 +639,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
                       onChange={(e) => setFillBots(e.target.checked)}
                       className="accent-emerald-400"
                     />
-                    Isi kursi kosong dengan Bot AI sampai 4 pemain
+                    Isi kursi kosong dengan Bot AI (minimal 4 pemain)
                   </label>
                   <div className="flex gap-2">
                     <button
@@ -671,7 +671,19 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
       ) : (
         <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-4 sm:p-6 space-y-5 shadow-2xl">
           {/* Opponents row */}
-          <div className={`grid gap-3 ${opponentSeats.length === 1 ? 'grid-cols-1 max-w-xs mx-auto' : 'grid-cols-1 sm:grid-cols-3'}`}>
+          <div
+            className={`grid gap-3 ${
+              opponentSeats.length === 1
+                ? 'grid-cols-1 max-w-xs mx-auto'
+                : opponentSeats.length === 2
+                  ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto'
+                  : opponentSeats.length === 3
+                    ? 'grid-cols-1 sm:grid-cols-3'
+                    : opponentSeats.length === 4
+                      ? 'grid-cols-2 sm:grid-cols-4'
+                      : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
+            }`}
+          >
             {opponentSeats.map((opp) => {
               const active = currentTurnIdx === opp.seatIdx && winnerIdx === null;
               return (

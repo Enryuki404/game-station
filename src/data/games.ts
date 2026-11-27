@@ -6,7 +6,7 @@ export const GAMES: GameMeta[] = [
     title: 'UNO Classic',
     subtitle: 'Kartu Pesta & Strategi',
     category: 'card',
-    modes: ['4 Pemain vs Bot', '2 Pemain vs Bot'],
+    modes: ['Online 2–6P', '4P vs Bot', '2P vs Bot'],
     description:
       'Cocokkan warna atau angka, lempar +2/+4 dan Skip, serta jangan lupa teriak UNO saat kartu tersisa satu!',
     accentFrom: 'from-rose-500',
@@ -19,7 +19,7 @@ export const GAMES: GameMeta[] = [
     title: 'Catur Master',
     subtitle: 'Strategi Papan Klasik',
     category: 'board',
-    modes: ['vs AI (3 Level)', '2 Pemain Lokal'],
+    modes: ['Online 1v1', 'vs AI (3 Level)', '2P Lokal'],
     description:
       'Aturan catur penuh termasuk Rokade, En Passant, dan Promosi Pion melawan AI Minimax atau teman di satu layar.',
     accentFrom: 'from-indigo-500',
@@ -32,7 +32,7 @@ export const GAMES: GameMeta[] = [
     title: 'Karambol Pro',
     subtitle: 'Fisika Papan Kayu',
     category: 'board',
-    modes: ['vs AI', '2 Pemain Lokal'],
+    modes: ['Online 1v1', 'vs AI', '2P Lokal'],
     description:
       'Geser striker di garis awal, tarik bidikan ketapel, masukkan koin warnamu dan cover Ratu Merah!',
     accentFrom: 'from-amber-500',
@@ -45,7 +45,7 @@ export const GAMES: GameMeta[] = [
     title: 'Billiard 8-Ball',
     subtitle: 'Simulasi Meja Pool 2D',
     category: 'board',
-    modes: ['vs AI', '2 Pemain Lokal'],
+    modes: ['Online 1v1', 'vs AI', '2P Lokal'],
     description:
       'Bidik dengan panduan ghost-ball, habiskan kelompok Solid atau Stripe, lalu tuntaskan dengan Bola 8!',
     accentFrom: 'from-emerald-500',

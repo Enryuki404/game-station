@@ -1,6 +1,15 @@
 import { io, type Socket } from 'socket.io-client';
 import type { GameId } from '../types/game';
+import {
+  createPeerRoom,
+  getPeerClient,
+  joinPeerRoom,
+  leavePeerRoom,
+  lookupPeerRoom,
+  type MultiplayerClient,
+} from './peerTransport';
 
+export type { MultiplayerClient } from './peerTransport';
 export type MultiplayerGameId = Extract<GameId, 'chess' | 'uno' | 'carrom' | 'billiard'>;
 
 export interface RoomPlayerInfo {
@@ -24,9 +33,15 @@ export interface OnlineSession {
   room: MultiplayerRoomInfo;
 }
 
+const USE_SOCKET_IO = import.meta.env.VITE_MULTIPLAYER_TRANSPORT === 'socketio';
+
+export function getMultiplayerTransport(): 'peerjs' | 'socketio' {
+  return USE_SOCKET_IO ? 'socketio' : 'peerjs';
+}
+
 let socketSingleton: Socket | null = null;
 
-export function getSocket(): Socket {
+function getSocketIoClient(): Socket {
   if (!socketSingleton) {
     const customUrl = import.meta.env.VITE_SOCKET_URL as string | undefined;
     socketSingleton = io(customUrl || undefined, {
@@ -40,7 +55,11 @@ export function getSocket(): Socket {
   return socketSingleton;
 }
 
-function ensureConnected(socket: Socket, timeoutMs = 4500): Promise<void> {
+export function getSocket(): MultiplayerClient {
+  return USE_SOCKET_IO ? getSocketIoClient() : getPeerClient();
+}
+
+function ensureSocketConnected(socket: Socket, timeoutMs = 4500): Promise<void> {
   if (socket.connected) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => {
@@ -70,8 +89,12 @@ export async function createOnlineRoom(
   gameId: MultiplayerGameId,
   nickname: string
 ): Promise<OnlineSession> {
-  const socket = getSocket();
-  await ensureConnected(socket);
+  if (!USE_SOCKET_IO) {
+    return createPeerRoom(gameId, nickname);
+  }
+
+  const socket = getSocketIoClient();
+  await ensureSocketConnected(socket);
   return new Promise((resolve, reject) => {
     socket.emit(
       'room:create',
@@ -97,8 +120,12 @@ export async function joinOnlineRoom(
   nickname: string,
   gameId?: MultiplayerGameId
 ): Promise<OnlineSession> {
-  const socket = getSocket();
-  await ensureConnected(socket);
+  if (!USE_SOCKET_IO) {
+    return joinPeerRoom(code, nickname, gameId);
+  }
+
+  const socket = getSocketIoClient();
+  await ensureSocketConnected(socket);
   return new Promise((resolve, reject) => {
     socket.emit(
       'room:join',
@@ -120,8 +147,12 @@ export async function joinOnlineRoom(
 }
 
 export async function lookupOnlineRoom(code: string): Promise<MultiplayerRoomInfo> {
-  const socket = getSocket();
-  await ensureConnected(socket);
+  if (!USE_SOCKET_IO) {
+    return lookupPeerRoom(code);
+  }
+
+  const socket = getSocketIoClient();
+  await ensureSocketConnected(socket);
   return new Promise((resolve, reject) => {
     socket.emit(
       'room:lookup',
@@ -138,6 +169,10 @@ export async function lookupOnlineRoom(code: string): Promise<MultiplayerRoomInf
 }
 
 export function leaveOnlineRoom(): void {
+  if (!USE_SOCKET_IO) {
+    leavePeerRoom();
+    return;
+  }
   if (socketSingleton?.connected) {
     socketSingleton.emit('room:leave');
   }

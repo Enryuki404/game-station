@@ -114,7 +114,7 @@ export const OnlineRoomModal: React.FC<OnlineRoomModalProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-extrabold text-white">Mabar Online — {gameTitle}</h2>
-            <p className="text-xs text-slate-400">Main sebagai Guest di perangkat masing-masing</p>
+            <p className="text-xs text-slate-400">Main P2P langsung sebagai Guest (tanpa login &amp; gratis)</p>
           </div>
           <button
             type="button"
@@ -161,7 +161,7 @@ export const OnlineRoomModal: React.FC<OnlineRoomModalProps> = ({
                   {activeSession.room.players.length} / {activeSession.room.maxPlayers}
                 </span>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
                 {activeSession.room.players.map((p) => (
                   <div
                     key={p.id}
