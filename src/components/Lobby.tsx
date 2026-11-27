@@ -173,9 +173,9 @@ export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onStartOnline, onOpe
   };
 
   return (
-    <main className="max-w-7xl mx-auto px-3 sm:px-6 py-6 sm:py-8 space-y-8">
+    <main className="w-full max-w-7xl mx-auto px-2.5 sm:px-5 lg:px-6 py-4 sm:py-8 pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-5 sm:space-y-8">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900/95 via-slate-900/80 to-indigo-950/60 p-6 sm:p-8 shadow-2xl">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900/95 via-slate-900/80 to-indigo-950/60 p-4 sm:p-6 md:p-8 shadow-2xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
@@ -232,33 +232,35 @@ export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onStartOnline, onOpe
 
       {/* Filter Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-2xl border border-slate-800 bg-slate-900/80 p-1 text-xs sm:text-sm">
-          {(
-            [
-              ['all', 'Semua Game (6)'],
-              ['card', 'Permainan Kartu (3)'],
-              ['board', 'Papan & Meja (3)'],
-            ] as Array<[GameCategory, string]>
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                sfx('click');
-                setCategory(key);
-              }}
-              className={`px-4 py-2 rounded-xl font-bold transition cursor-pointer ${
-                category === key ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="max-w-full overflow-x-auto no-scrollbar">
+          <div className="inline-flex rounded-2xl border border-slate-800 bg-slate-900/80 p-1 text-xs sm:text-sm">
+            {(
+              [
+                ['all', 'Semua Game (6)'],
+                ['card', 'Permainan Kartu (3)'],
+                ['board', 'Papan & Meja (3)'],
+              ] as Array<[GameCategory, string]>
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  sfx('click');
+                  setCategory(key);
+                }}
+                className={`px-3 sm:px-4 py-2 rounded-xl font-bold whitespace-nowrap transition cursor-pointer ${
+                  category === key ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Game Grid */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {filtered.map((game, idx) => {
           const st = stats[game.id] ?? { played: 0, won: 0 };
           return (

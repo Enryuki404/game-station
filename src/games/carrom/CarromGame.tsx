@@ -1257,8 +1257,8 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
         'Menang vs AI atau Online memberikan +500 Chip.',
       ]}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,560px)_300px] gap-6 items-start justify-center">
-        <div className="mx-auto w-full max-w-[560px] space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,480px)_minmax(240px,300px)] lg:grid-cols-[minmax(0,560px)_300px] gap-4 lg:gap-6 items-start justify-center">
+        <div className="mx-auto w-full max-w-[560px] md:max-w-[min(100%,560px,calc(100dvh-225px))] space-y-2.5 sm:space-y-3">
           <div className="rounded-2xl overflow-hidden border-2 border-amber-900/60 shadow-2xl bg-amber-950/40">
             <canvas
               ref={canvasRef}

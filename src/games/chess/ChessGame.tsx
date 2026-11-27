@@ -565,9 +565,9 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,560px)_1fr] gap-6 items-start justify-center">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,480px)_1fr] lg:grid-cols-[minmax(0,560px)_1fr] gap-4 lg:gap-6 items-start justify-center">
         {/* Board Column */}
-        <div className="mx-auto w-full max-w-[560px] space-y-3">
+        <div className="mx-auto w-full max-w-[560px] md:max-w-[min(100%,560px,calc(100dvh-210px))] space-y-2.5 sm:space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2 text-xs text-slate-300">
               <span className="font-bold text-white">{topHud.label}</span>

@@ -69,24 +69,24 @@ export const Navbar: React.FC<NavbarProps> = ({ activeGame, onSelectHome }) => {
   const currentTitle = activeGame ? GAMES.find((g) => g.id === activeGame)?.title : null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#090d16]/85 backdrop-blur-xl">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+    <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#090d16]/85 backdrop-blur-xl pt-[env(safe-area-inset-top)]">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             type="button"
             onClick={() => {
               sfx('click');
               onSelectHome();
             }}
-            className="flex items-center gap-2.5 group cursor-pointer btn-tactile"
+            className="flex items-center gap-2 sm:gap-2.5 group cursor-pointer btn-tactile"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-emerald-400 p-[1px] shadow-lg shadow-indigo-500/20">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-emerald-400 p-[1px] shadow-lg shadow-indigo-500/20 shrink-0">
               <div className="w-full h-full rounded-[11px] bg-slate-950 flex items-center justify-center">
-                <Gamepad2 className="w-5 h-5 text-indigo-300 group-hover:scale-110 transition-transform" />
+                <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-300 group-hover:scale-110 transition-transform" />
               </div>
             </div>
-            <div className="text-left">
-              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white block leading-none">
+            <div className="text-left min-w-0">
+              <span className="font-extrabold text-xs sm:text-base tracking-tight text-white block leading-none truncate">
                 GAME STATION
               </span>
               <span className="text-[11px] text-slate-400 hidden sm:block">Arcade &amp; Table Hub</span>
@@ -101,7 +101,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeGame, onSelectHome }) => {
           )}
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Guest Nickname Pill */}
           {editingName ? (
             <form
@@ -118,7 +118,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeGame, onSelectHome }) => {
                 autoFocus
                 onChange={(e) => setDraftName(e.target.value)}
                 onBlur={saveDraftName}
-                className="w-24 sm:w-28 bg-transparent text-xs font-semibold text-white focus:outline-none"
+                className="w-20 sm:w-28 bg-transparent text-xs font-semibold text-white focus:outline-none"
                 placeholder="Nama Tamu"
               />
               <button type="submit" className="text-emerald-400 hover:text-emerald-300 cursor-pointer">
@@ -133,11 +133,11 @@ export const Navbar: React.FC<NavbarProps> = ({ activeGame, onSelectHome }) => {
                 setEditingName(true);
               }}
               title="Ubah nama Guest"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/90 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:border-indigo-500/50 hover:text-white transition cursor-pointer btn-tactile"
+              className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-slate-800 bg-slate-900/90 px-2 sm:px-2.5 py-1 sm:py-1.5 text-xs font-semibold text-slate-200 hover:border-indigo-500/50 hover:text-white transition cursor-pointer btn-tactile"
             >
-              <User className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="max-w-[76px] sm:max-w-[110px] truncate">{nickname}</span>
-              <Pencil className="w-3 h-3 text-slate-500" />
+              <User className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="max-w-[58px] sm:max-w-[110px] truncate">{nickname}</span>
+              <Pencil className="w-3 h-3 text-slate-500 hidden xs:inline" />
             </button>
           )}
 
@@ -147,8 +147,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeGame, onSelectHome }) => {
             <span className="text-slate-400">Menang</span>
           </div>
 
-          <div className="relative inline-flex items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-1.5">
-            <Coins className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="relative inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-2 sm:px-3 py-1 sm:py-1.5">
+            <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
             <span className="text-xs sm:text-sm font-extrabold font-mono-num text-amber-300">
               {displayChips.toLocaleString('id-ID')}
             </span>

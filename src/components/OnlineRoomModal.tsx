@@ -104,11 +104,11 @@ export const OnlineRoomModal: React.FC<OnlineRoomModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-3xl border border-slate-700/80 bg-slate-900 p-6 shadow-2xl animate-pop-in space-y-5"
+        className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-3xl border border-slate-700/80 bg-slate-900 p-4 sm:p-6 shadow-2xl animate-pop-in space-y-4 sm:space-y-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">

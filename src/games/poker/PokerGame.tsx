@@ -188,16 +188,16 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
       <div className="space-y-4">
         {/* AI Seats */}
         <div
-          className={`grid gap-3 ${
+          className={`grid gap-2 sm:gap-3 ${
             aiPlayers.length === 1
               ? 'grid-cols-1 max-w-md mx-auto'
               : aiPlayers.length === 2
-                ? 'grid-cols-1 sm:grid-cols-2'
+                ? 'grid-cols-2'
                 : aiPlayers.length === 3
-                  ? 'grid-cols-1 sm:grid-cols-3'
+                  ? 'grid-cols-2 sm:grid-cols-3'
                   : aiPlayers.length === 4
-                    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
-                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
+                    ? 'grid-cols-2 lg:grid-cols-4'
+                    : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-5'
           }`}
         >
           {aiPlayers.map((ai, i) => {
@@ -208,7 +208,7 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
             return (
               <div
                 key={ai.id}
-                className={`rounded-2xl border p-3 flex items-center justify-between gap-2 transition ${
+                className={`rounded-xl sm:rounded-2xl border p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-hidden min-w-0 transition ${
                   isWinner
                     ? 'border-amber-400 bg-amber-500/15'
                     : active
@@ -263,8 +263,8 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
         </div>
 
         {/* Poker Table Felt */}
-        <div className="felt-surface rounded-3xl border border-emerald-700/50 p-5 sm:p-8 flex flex-col items-center gap-5 shadow-2xl">
-          <div className="flex flex-wrap items-center justify-center gap-3">
+        <div className="felt-surface rounded-2xl sm:rounded-3xl border border-emerald-700/50 p-3.5 sm:p-8 flex flex-col items-center gap-4 sm:gap-5 shadow-2xl">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
             <span
               key={state.pot}
               className="inline-flex items-center gap-2 rounded-full bg-black/45 border border-amber-400/35 px-4 py-1.5 text-sm font-extrabold font-mono-num text-amber-300 animate-pot-pulse"
@@ -277,7 +277,7 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
           </div>
 
           {/* Community Cards */}
-          <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap min-h-[100px]">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap min-h-[86px] sm:min-h-[100px]">
             {Array.from({ length: 5 }).map((_, idx) => {
               const card = state.community[idx];
               return card ? (
@@ -285,7 +285,7 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
               ) : (
                 <div
                   key={idx}
-                  className="w-16 h-[92px] rounded-xl border-2 border-dashed border-emerald-300/20 bg-black/15"
+                  className="w-12 h-[68px] sm:w-16 sm:h-[92px] rounded-xl border-2 border-dashed border-emerald-300/20 bg-black/15"
                 />
               );
             })}
@@ -297,8 +297,8 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
         </div>
 
         {/* Human Seat & Controls */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-5 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3 sm:p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 {human.cards.map((c) => (
@@ -333,8 +333,8 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
 
             {/* Action Buttons */}
             {isHumanTurn && (
-              <div className="flex flex-col items-end gap-2.5 flex-1 min-w-[260px]">
-                <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex flex-col items-stretch sm:items-end gap-2.5 flex-1 w-full sm:w-auto sm:min-w-[260px]">
+                <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => handleHumanAction({ type: 'fold' })}

@@ -1544,14 +1544,14 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
         ...VARIANT_META[variant].rules,
       ]}
     >
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Player / Team Scoreboard Cards */}
         <div
-          className={`grid gap-2.5 ${
+          className={`grid gap-2 sm:gap-2.5 ${
             hud.playerCount === 2
-              ? 'grid-cols-1 sm:grid-cols-2'
+              ? 'grid-cols-2'
               : hud.playerCount === 3
-                ? 'grid-cols-1 sm:grid-cols-3'
+                ? 'grid-cols-2 sm:grid-cols-3'
                 : 'grid-cols-2 sm:grid-cols-4'
           }`}
         >
@@ -1576,24 +1576,24 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
             return (
               <div
                 key={pNum}
-                className={`rounded-2xl border p-3 transition ${
+                className={`rounded-xl sm:rounded-2xl border p-2 sm:p-3 transition ${
                   active ? 'border-emerald-400/70 bg-emerald-500/12 shadow-lg shadow-emerald-500/10' : 'border-slate-800 bg-slate-900/75'
                 }`}
               >
-                <p className="text-xs text-slate-400 truncate">
+                <p className="text-[11px] sm:text-xs text-slate-400 truncate">
                   P{pNum} • {getPlayerLabel(pNum)}
                 </p>
-                <p className="text-sm font-bold text-white mt-0.5 truncate">{metaText}</p>
+                <p className="text-xs sm:text-sm font-bold text-white mt-0.5 truncate">{metaText}</p>
               </div>
             );
           })}
         </div>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-900/75 px-4 py-2 text-center">
+        <div className="rounded-xl border border-slate-800 bg-slate-900/75 px-3 sm:px-4 py-1.5 sm:py-2 text-center">
           <p className="text-xs sm:text-sm font-medium text-emerald-300">{hud.status}</p>
         </div>
 
-        <div className="max-w-5xl mx-auto rounded-2xl overflow-hidden border-2 border-amber-950 shadow-2xl">
+        <div className="w-full max-w-5xl md:max-w-[min(100%,1024px,calc((100dvh-240px)*1.83))] mx-auto rounded-xl sm:rounded-2xl overflow-hidden border-2 border-amber-950 shadow-2xl">
           <canvas
             ref={canvasRef}
             onPointerDown={handlePointerDown}
@@ -1603,6 +1603,10 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
             className="w-full aspect-[880/480] block touch-none cursor-crosshair"
           />
         </div>
+
+        <p className="sm:hidden text-[11px] text-slate-400 text-center">
+          Tips HP: Putar layar ke mode Landscape untuk meja biliar yang lebih lebar.
+        </p>
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/75 px-4 py-3">
           <div className="flex items-center gap-2 flex-wrap">

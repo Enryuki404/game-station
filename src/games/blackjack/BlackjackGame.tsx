@@ -308,7 +308,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({ onBack }) => {
         'Dealer wajib mengambil kartu hingga total minimal 17.',
       ]}
     >
-      <div className="felt-surface rounded-3xl border border-emerald-700/50 p-4 sm:p-8 shadow-2xl space-y-6">
+      <div className="felt-surface rounded-2xl sm:rounded-3xl border border-emerald-700/50 p-3 sm:p-8 shadow-2xl space-y-4 sm:space-y-6">
         {/* Dealer Section */}
         <div className="flex flex-col items-center gap-3 min-h-[145px]">
           <div className="flex items-center gap-2">
@@ -414,8 +414,8 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({ onBack }) => {
 
         {/* Controls */}
         {phase === 'betting' && (
-          <div className="rounded-2xl border border-white/10 bg-black/35 p-4 space-y-4">
-            <div className="flex flex-wrap items-center justify-center gap-2.5">
+          <div className="rounded-2xl border border-white/10 bg-black/35 p-3 sm:p-4 space-y-3 sm:space-y-4">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5">
               {CHIP_DENOMS.map((denom) => (
                 <button
                   key={denom}
@@ -425,7 +425,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({ onBack }) => {
                     sfx('chip');
                     setStagedBet((b) => Math.min(chips, b + denom));
                   }}
-                  className={`w-14 h-14 rounded-full border-2 border-dashed bg-gradient-to-br ${CHIP_COLORS[denom]} font-mono-num text-xs font-extrabold shadow-lg hover:scale-105 disabled:opacity-35 btn-tactile cursor-pointer`}
+                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-dashed bg-gradient-to-br ${CHIP_COLORS[denom]} font-mono-num text-[11px] sm:text-xs font-extrabold shadow-lg hover:scale-105 disabled:opacity-35 btn-tactile cursor-pointer`}
                 >
                   +{denom}
                 </button>

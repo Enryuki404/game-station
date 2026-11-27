@@ -154,7 +154,7 @@ const UnoCardView: React.FC<{
       ? 'from-slate-800 via-slate-900 to-slate-950 border-white/40'
       : COLOR_STYLES[card.color].bg;
   const textTone = card.color === 'yellow' ? 'text-slate-950' : 'text-white';
-  const dim = size === 'sm' ? 'w-14 h-20 text-base' : 'w-16 sm:w-20 h-24 sm:h-28 text-xl sm:text-2xl';
+  const dim = size === 'sm' ? 'w-14 h-20 text-base' : 'w-[54px] sm:w-20 h-[80px] sm:h-28 text-lg sm:text-2xl';
 
   return (
     <button
@@ -683,16 +683,16 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
           )}
         </div>
       ) : (
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-4 sm:p-6 space-y-5 shadow-2xl">
+        <div className="rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900/70 p-3 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl">
           {/* Opponents row */}
           <div
-            className={`grid gap-3 ${
+            className={`grid gap-2 sm:gap-3 ${
               opponentSeats.length === 1
                 ? 'grid-cols-1 max-w-xs mx-auto'
                 : opponentSeats.length === 2
-                  ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto'
+                  ? 'grid-cols-2 max-w-2xl mx-auto'
                   : opponentSeats.length === 3
-                    ? 'grid-cols-1 sm:grid-cols-3'
+                    ? 'grid-cols-2 sm:grid-cols-3'
                     : opponentSeats.length === 4
                       ? 'grid-cols-2 sm:grid-cols-4'
                       : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
@@ -703,26 +703,26 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               return (
                 <div
                   key={opp.id}
-                  className={`rounded-2xl border p-3 flex items-center justify-between transition ${
+                  className={`rounded-xl sm:rounded-2xl border p-2 sm:p-3 flex items-center justify-between gap-1.5 sm:gap-2 overflow-hidden min-w-0 transition ${
                     active
                       ? 'border-amber-400/70 bg-amber-500/10 shadow-lg shadow-amber-500/10'
                       : 'border-slate-800 bg-slate-950/50'
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full ${active ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'}`} />
-                      <span className="font-bold text-sm text-white">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0 rounded-full ${active ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'}`} />
+                      <span className="font-bold text-xs sm:text-sm text-white truncate">
                         {opp.name} {!opp.connected ? '(Offline)' : ''}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">{opp.cardCount} kartu tersisa</p>
+                    <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">{opp.cardCount} kartu tersisa</p>
                   </div>
-                  <div className="flex -space-x-3">
-                    {Array.from({ length: Math.min(opp.cardCount, 5) }).map((_, i) => (
+                  <div className="flex -space-x-2.5 sm:-space-x-3 shrink-0">
+                    {Array.from({ length: Math.min(opp.cardCount, 4) }).map((_, i) => (
                       <div
                         key={i}
-                        className="w-7 h-10 rounded-md border border-rose-400/40 bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-[9px] font-black text-rose-400 shadow"
+                        className="w-5 h-7 sm:w-7 sm:h-10 rounded sm:rounded-md border border-rose-400/40 bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-[8px] sm:text-[9px] font-black text-rose-400 shadow"
                       >
                         U
                       </div>
