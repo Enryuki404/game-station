@@ -19,11 +19,12 @@ interface PokerGameProps {
 export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
   const { chips, addChips, spendChips, refillChips, canRefill, recordGame, sfx } = useGameStation();
   const [stakes, setStakes] = useState<'low' | 'high'>('low');
+  const [aiCount, setAiCount] = useState<number>(3);
   const sb = stakes === 'low' ? 25 : 100;
   const bb = stakes === 'low' ? 50 : 200;
 
   const [state, setState] = useState<PokerState>(() =>
-    createPokerHand(Math.max(chips, 0), null, 0, 25, 50)
+    createPokerHand(Math.max(chips, 0), null, 0, 25, 50, 3)
   );
   const [raiseSlider, setRaiseSlider] = useState(100);
   const [confettiKey, setConfettiKey] = useState(0);
@@ -42,18 +43,18 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
 
   // Start new hand cleanly
   const startNewHand = useCallback(
-    (nextStakes: 'low' | 'high' = stakes) => {
+    (nextStakes: 'low' | 'high' = stakes, nextAiCount: number = aiCount) => {
       const nextSb = nextStakes === 'low' ? 25 : 100;
       const nextBb = nextStakes === 'low' ? 50 : 200;
-      const nextDealer = (state.dealerIdx + 1) % 4;
+      const nextDealer = (state.dealerIdx + 1) % (nextAiCount + 1);
       syncedShowdownRef.current = false;
       initialChipsRef.current = chips;
-      const hand = createPokerHand(chips, state.players, nextDealer, nextSb, nextBb);
+      const hand = createPokerHand(chips, state.players, nextDealer, nextSb, nextBb, nextAiCount);
       setState(hand);
       setRaiseSlider(hand.currentBet + hand.minRaise);
       sfx('card');
     },
-    [chips, sfx, stakes, state.dealerIdx, state.players]
+    [aiCount, chips, sfx, stakes, state.dealerIdx, state.players]
   );
 
   // Sync wallet & stats on showdown
@@ -120,40 +121,61 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
   return (
     <GameShell
       title="Texas Hold'em Poker"
-      subtitle={`Meja 4 pemain melawan AI — Blind ${sb}/${bb}`}
+      subtitle={`Meja ${aiCount + 1} pemain melawan ${aiCount} AI — Blind ${sb}/${bb}`}
       onBack={() => {
         if (state.street !== 'showdown') syncHumanDelta(state);
         onBack();
       }}
       onRestart={() => startNewHand()}
       controls={
-        <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs">
-          <button
-            type="button"
-            onClick={() => {
-              sfx('click');
-              setStakes('low');
-              startNewHand('low');
-            }}
-            className={`px-2.5 py-1 rounded-lg font-semibold cursor-pointer ${
-              stakes === 'low' ? 'bg-indigo-600 text-white' : 'text-slate-300'
-            }`}
-          >
-            Blind 25/50
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              sfx('click');
-              setStakes('high');
-              startNewHand('high');
-            }}
-            className={`px-2.5 py-1 rounded-lg font-semibold cursor-pointer ${
-              stakes === 'high' ? 'bg-indigo-600 text-white' : 'text-slate-300'
-            }`}
-          >
-            Blind 100/200
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                sfx('click');
+                setStakes('low');
+                startNewHand('low', aiCount);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-semibold cursor-pointer ${
+                stakes === 'low' ? 'bg-indigo-600 text-white' : 'text-slate-300'
+              }`}
+            >
+              Blind 25/50
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                sfx('click');
+                setStakes('high');
+                startNewHand('high', aiCount);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-semibold cursor-pointer ${
+                stakes === 'high' ? 'bg-indigo-600 text-white' : 'text-slate-300'
+              }`}
+            >
+              Blind 100/200
+            </button>
+          </div>
+          <div className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-xs">
+            <span className="text-slate-400 font-semibold pr-1">Musuh AI:</span>
+            {[1, 2, 3, 4, 5].map((cnt) => (
+              <button
+                key={cnt}
+                type="button"
+                onClick={() => {
+                  sfx('click');
+                  setAiCount(cnt);
+                  startNewHand(stakes, cnt);
+                }}
+                className={`px-2 py-1 rounded-lg font-bold cursor-pointer ${
+                  aiCount === cnt ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                {cnt}
+              </button>
+            ))}
+          </div>
         </div>
       }
       rules={[
@@ -165,7 +187,19 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
     >
       <div className="space-y-4">
         {/* AI Seats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div
+          className={`grid gap-3 ${
+            aiPlayers.length === 1
+              ? 'grid-cols-1 max-w-md mx-auto'
+              : aiPlayers.length === 2
+                ? 'grid-cols-1 sm:grid-cols-2'
+                : aiPlayers.length === 3
+                  ? 'grid-cols-1 sm:grid-cols-3'
+                  : aiPlayers.length === 4
+                    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
+          }`}
+        >
           {aiPlayers.map((ai, i) => {
             const seatIdx = i + 1;
             const active = state.turnIdx === seatIdx && state.street !== 'showdown';

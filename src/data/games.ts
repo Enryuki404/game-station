@@ -6,7 +6,7 @@ export const GAMES: GameMeta[] = [
     title: 'UNO Classic',
     subtitle: 'Kartu Pesta & Strategi',
     category: 'card',
-    modes: ['Online 2–6P', '4P vs Bot', '2P vs Bot'],
+    modes: ['Online 2–6P', 'vs 1–5 AI'],
     description:
       'Cocokkan warna atau angka, lempar +2/+4 dan Skip, serta jangan lupa teriak UNO saat kartu tersisa satu!',
     accentFrom: 'from-rose-500',
@@ -21,7 +21,7 @@ export const GAMES: GameMeta[] = [
     category: 'board',
     modes: ['Online 1v1', 'vs AI (3 Level)', '2P Lokal'],
     description:
-      'Aturan catur penuh termasuk Rokade, En Passant, dan Promosi Pion melawan AI Minimax atau teman di satu layar.',
+      'Aturan catur penuh termasuk Rokade, En Passant, dan Promosi Pion melawan AI Minimax atau teman secara online.',
     accentFrom: 'from-indigo-500',
     accentTo: 'to-cyan-500',
     badgeColor: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
@@ -30,11 +30,11 @@ export const GAMES: GameMeta[] = [
   {
     id: 'carrom',
     title: 'Karambol Pro',
-    subtitle: 'Fisika Papan Kayu',
+    subtitle: 'Fisika Papan Kayu Statis',
     category: 'board',
-    modes: ['Online 1v1', 'vs AI', '2P Lokal'],
+    modes: ['Online 2–4P', '4P (2v2)', 'vs 1–3 AI'],
     description:
-      'Geser striker di garis awal, tarik bidikan ketapel, masukkan koin warnamu dan cover Ratu Merah!',
+      'Papan statis tanpa putar! Geser striker di garis awal, tarik bidikan ketapel, dan cover Ratu Merah.',
     accentFrom: 'from-amber-500',
     accentTo: 'to-orange-600',
     badgeColor: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
@@ -42,12 +42,12 @@ export const GAMES: GameMeta[] = [
   },
   {
     id: 'billiard',
-    title: 'Billiard 8-Ball',
-    subtitle: 'Simulasi Meja Pool 2D',
+    title: 'Billiard Pro',
+    subtitle: '8-Ball, 9-Ball, 15-Point & Cutthroat',
     category: 'board',
-    modes: ['Online 1v1', 'vs AI', '2P Lokal'],
+    modes: ['Online 2–4P', '4 Mode Pool', 'vs 1–3 AI'],
     description:
-      'Bidik dengan panduan ghost-ball, habiskan kelompok Solid atau Stripe, lalu tuntaskan dengan Bola 8!',
+      'Pilih mode 8-Ball, 9-Ball Diamond, 15-Ball Point, atau Cutthroat 3P dengan panduan ghost-ball presisi.',
     accentFrom: 'from-emerald-500',
     accentTo: 'to-teal-600',
     badgeColor: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
@@ -69,11 +69,11 @@ export const GAMES: GameMeta[] = [
   {
     id: 'poker',
     title: "Texas Hold'em Poker",
-    subtitle: 'Meja 4 Pemain & AI',
+    subtitle: 'Meja 2–6 Pemain & AI',
     category: 'card',
-    modes: ['Blind 25/50', 'Blind 100/200'],
+    modes: ['vs 1–5 AI', 'Blind 25/50', 'Blind 100/200'],
     description:
-      'Susun kombinasi terbaik mulai dari One Pair hingga Royal Flush dengan fitur Check, Call, Raise, dan All-In.',
+      'Atur jumlah lawan AI 1–5 meja, susun kombinasi hingga Royal Flush dengan fitur Check, Call, Raise, dan All-In.',
     accentFrom: 'from-sky-500',
     accentTo: 'to-blue-600',
     badgeColor: 'bg-sky-500/15 text-sky-300 border-sky-500/30',

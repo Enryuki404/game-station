@@ -31,6 +31,7 @@ const GameStationApp: React.FC = () => {
   const initial = parseInitialParams();
   const [activeGame, setActiveGame] = useState<GameId | null>(initial.game);
   const [pendingRoomCode, setPendingRoomCode] = useState<string | null>(initial.room);
+  const [startOnlineMode, setStartOnlineMode] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
@@ -39,6 +40,7 @@ const GameStationApp: React.FC = () => {
   const goHome = () => {
     leaveOnlineRoom();
     setPendingRoomCode(null);
+    setStartOnlineMode(false);
     if (window.location.search) {
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -47,10 +49,18 @@ const GameStationApp: React.FC = () => {
 
   const handleSelectGame = (id: GameId) => {
     setPendingRoomCode(null);
+    setStartOnlineMode(false);
+    setActiveGame(id);
+  };
+
+  const handleStartOnline = (id: GameId) => {
+    setPendingRoomCode(null);
+    setStartOnlineMode(true);
     setActiveGame(id);
   };
 
   const handleOpenRoom = (id: GameId, code: string) => {
+    setStartOnlineMode(false);
     setPendingRoomCode(code.trim().toUpperCase());
     setActiveGame(id);
   };
@@ -70,12 +80,24 @@ const GameStationApp: React.FC = () => {
 
       <div key={activeGame ?? 'lobby'} className="flex-1 animate-view-enter">
         {activeGame === null && (
-          <Lobby onSelectGame={handleSelectGame} onOpenRoom={handleOpenRoom} />
+          <Lobby
+            onSelectGame={handleSelectGame}
+            onStartOnline={handleStartOnline}
+            onOpenRoom={handleOpenRoom}
+          />
         )}
-        {activeGame === 'uno' && <UnoGame onBack={goHome} initialRoomCode={pendingRoomCode} />}
-        {activeGame === 'chess' && <ChessGame onBack={goHome} initialRoomCode={pendingRoomCode} />}
-        {activeGame === 'carrom' && <CarromGame onBack={goHome} initialRoomCode={pendingRoomCode} />}
-        {activeGame === 'billiard' && <BilliardGame onBack={goHome} initialRoomCode={pendingRoomCode} />}
+        {activeGame === 'uno' && (
+          <UnoGame onBack={goHome} initialRoomCode={pendingRoomCode} initialOnline={startOnlineMode} />
+        )}
+        {activeGame === 'chess' && (
+          <ChessGame onBack={goHome} initialRoomCode={pendingRoomCode} initialOnline={startOnlineMode} />
+        )}
+        {activeGame === 'carrom' && (
+          <CarromGame onBack={goHome} initialRoomCode={pendingRoomCode} initialOnline={startOnlineMode} />
+        )}
+        {activeGame === 'billiard' && (
+          <BilliardGame onBack={goHome} initialRoomCode={pendingRoomCode} initialOnline={startOnlineMode} />
+        )}
         {activeGame === 'blackjack' && <BlackjackGame onBack={goHome} />}
         {activeGame === 'poker' && <PokerGame onBack={goHome} />}
       </div>

@@ -22,10 +22,11 @@ export const POOL_POCKETS: Pocket[] = [
   { x: POOL_W - RAIL - 6, y: POOL_H - RAIL - 6, radius: POOL_POCKET_RADIUS },
 ];
 
+export type BilliardVariant = '8ball' | '9ball' | '15point' | 'cutthroat';
 export type BallGroup = 'solid' | 'stripe';
 
 export interface PoolBall extends PhysicsBody {
-  number: number; // 0 = cue, 1..7 solid, 8 = eight, 9..15 stripe
+  number: number; // 0 = cue, 1..15 object balls
 }
 
 const BALL_COLORS: Record<number, string> = {
@@ -53,53 +54,85 @@ export function getBallGroup(num: number): BallGroup | 'cue' | 'eight' {
   return num <= 7 ? 'solid' : 'stripe';
 }
 
-export function createPoolBalls(): PoolBall[] {
-  const balls: PoolBall[] = [];
+export function getCutthroatRange(playerNum: number): [number, number] {
+  if (playerNum === 1) return [1, 5];
+  if (playerNum === 2) return [6, 10];
+  return [11, 15];
+}
 
-  // Cue ball
-  balls.push({
-    id: 'ball-0',
-    number: 0,
-    x: POOL_W * 0.26,
-    y: POOL_H / 2,
+export function getLowestBallNumber(balls: PoolBall[]): number | null {
+  let min: number | null = null;
+  for (const b of balls) {
+    if (!b.pocketed && b.number > 0) {
+      if (min === null || b.number < min) min = b.number;
+    }
+  }
+  return min;
+}
+
+function makeObjectBall(num: number, x: number, y: number): PoolBall {
+  return {
+    id: `ball-${num}`,
+    number: num,
+    x,
+    y,
     vx: 0,
     vy: 0,
     radius: BALL_RADIUS,
     mass: 1,
     restitution: 0.92,
     pocketed: false,
-    kind: 'cue',
-    color: BALL_COLORS[0],
-  });
+    kind: getBallGroup(num),
+    color: BALL_COLORS[num],
+    label: String(num),
+  };
+}
 
-  // Triangle rack (8-ball in center, alternating corner solid/stripe)
-  const rackOrder = [1, 9, 2, 10, 8, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
+export function createPoolBalls(variant: BilliardVariant = '8ball'): PoolBall[] {
+  const balls: PoolBall[] = [
+    {
+      id: 'ball-0',
+      number: 0,
+      x: POOL_W * 0.26,
+      y: POOL_H / 2,
+      vx: 0,
+      vy: 0,
+      radius: BALL_RADIUS,
+      mass: 1,
+      restitution: 0.92,
+      pocketed: false,
+      kind: 'cue',
+      color: BALL_COLORS[0],
+    },
+  ];
+
   const startX = POOL_W * 0.72;
   const startY = POOL_H / 2;
   const dx = BALL_RADIUS * 1.76;
   const dy = BALL_RADIUS * 2.04;
 
+  if (variant === '9ball') {
+    // Authentic 9-Ball Diamond Rack: 1 in front, 9 in center, 8 at back
+    const rows: number[][] = [[1], [2, 3], [4, 9, 5], [6, 7], [8]];
+    rows.forEach((rowNums, rowIdx) => {
+      rowNums.forEach((num, colIdx) => {
+        const x = startX + rowIdx * dx;
+        const y = startY + (colIdx - (rowNums.length - 1) / 2) * dy;
+        balls.push(makeObjectBall(num, x, y));
+      });
+    });
+    return balls;
+  }
+
+  // Standard 15-Ball Triangle Rack (8-ball, 15-point, cutthroat)
+  const rackOrder = [1, 9, 2, 10, 8, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
   let idx = 0;
   for (let row = 0; row < 5; row++) {
     for (let col = 0; col <= row; col++) {
       const num = rackOrder[idx++];
       const x = startX + row * dx;
       const y = startY + (col - row / 2) * dy;
-      balls.push({
-        id: `ball-${num}`,
-        number: num,
-        x,
-        y,
-        vx: 0,
-        vy: 0,
-        radius: BALL_RADIUS,
-        mass: 1,
-        restitution: 0.92,
-        pocketed: false,
-        kind: getBallGroup(num),
-        color: BALL_COLORS[num],
-        label: String(num),
-      });
+      balls.push(makeObjectBall(num, x, y));
     }
   }
 
@@ -142,6 +175,22 @@ export function findSafeCueSpot(balls: PoolBall[]): { x: number; y: number } {
   return { x: POOL_W * 0.26, y: POOL_H / 2 };
 }
 
+export function findSafeFootSpot(balls: PoolBall[]): { x: number; y: number } {
+  const foot = { x: POOL_W * 0.72, y: POOL_H / 2 };
+  if (isCuePlacementValid(balls, foot.x, foot.y)) return foot;
+  for (let offset = 28; offset <= 160; offset += 24) {
+    for (const candidate of [
+      { x: foot.x + offset, y: foot.y },
+      { x: foot.x - offset, y: foot.y },
+      { x: foot.x, y: foot.y + offset },
+      { x: foot.x, y: foot.y - offset },
+    ]) {
+      if (isCuePlacementValid(balls, candidate.x, candidate.y)) return candidate;
+    }
+  }
+  return findSafeCueSpot(balls);
+}
+
 function segmentClear(
   balls: PoolBall[],
   ax: number,
@@ -167,18 +216,32 @@ function segmentClear(
 
 export function computePoolAiShot(
   balls: PoolBall[],
-  assignedGroup: BallGroup | null
+  variant: BilliardVariant = '8ball',
+  opts: { assignedGroup?: BallGroup | null; playerNum?: number } = {}
 ): { vx: number; vy: number } {
   const cue = balls.find((b) => b.number === 0);
   if (!cue || cue.pocketed) return { vx: 12, vy: 0 };
 
-  const groupBalls = balls.filter(
-    (b) => !b.pocketed && b.number !== 0 && b.number !== 8 && (!assignedGroup || getBallGroup(b.number) === assignedGroup)
-  );
-  const targets = groupBalls.length > 0 ? groupBalls : balls.filter((b) => !b.pocketed && b.number === 8);
+  let targets: PoolBall[] = [];
+  if (variant === '9ball') {
+    const low = getLowestBallNumber(balls);
+    targets = balls.filter((b) => !b.pocketed && b.number === low);
+  } else if (variant === '15point') {
+    targets = balls.filter((b) => !b.pocketed && b.number > 0);
+  } else if (variant === 'cutthroat') {
+    const [lo, hi] = getCutthroatRange(opts.playerNum ?? 2);
+    targets = balls.filter((b) => !b.pocketed && b.number > 0 && (b.number < lo || b.number > hi));
+    if (targets.length === 0) targets = balls.filter((b) => !b.pocketed && b.number > 0);
+  } else {
+    const grp = opts.assignedGroup ?? null;
+    const groupBalls = balls.filter(
+      (b) => !b.pocketed && b.number !== 0 && b.number !== 8 && (!grp || getBallGroup(b.number) === grp)
+    );
+    targets = groupBalls.length > 0 ? groupBalls : balls.filter((b) => !b.pocketed && b.number === 8);
+  }
 
   let bestScore = -Infinity;
-  let bestVec = { vx: 14, vy: 0 };
+  let bestVec: { vx: number; vy: number } | null = null;
 
   for (const target of targets) {
     for (const pocket of POOL_POCKETS) {
@@ -205,7 +268,8 @@ export function computePoolAiShot(
         segmentClear(balls, cue.x, cue.y, ghostX, ghostY, ignore) &&
         segmentClear(balls, target.x, target.y, pocket.x, pocket.y, ignore);
 
-      const score = dot * 100 - tpDist * 0.1 - cgDist * 0.06 + (clear ? 110 : 0);
+      const pointBonus = variant === '15point' ? target.number * 2.5 : 0;
+      const score = dot * 100 - tpDist * 0.1 - cgDist * 0.06 + (clear ? 110 : 0) + pointBonus;
       if (score > bestScore) {
         bestScore = score;
         const speed = Math.min(22, Math.max(11, (cgDist + tpDist) * 0.028));
@@ -214,7 +278,17 @@ export function computePoolAiShot(
     }
   }
 
-  return bestVec;
+  if (bestVec) return bestVec;
+
+  // Direct hit fallback toward lowest/first target
+  const fallback = targets[0];
+  if (fallback) {
+    const dx = fallback.x - cue.x;
+    const dy = fallback.y - cue.y;
+    const d = Math.hypot(dx, dy) || 1;
+    return { vx: (dx / d) * 14, vy: (dy / d) * 14 };
+  }
+  return { vx: 14, vy: 0 };
 }
 
 export function raycastAim(

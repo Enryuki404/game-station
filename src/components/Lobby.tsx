@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dices, Loader2, LogIn, Play, Sparkles, Trophy, X } from 'lucide-react';
+import { Dices, Globe, Loader2, LogIn, Play, Sparkles, Trophy, X } from 'lucide-react';
 import { GAMES } from '../data/games';
 import { useGameStation } from '../context/GameStationContext';
 import { lookupOnlineRoom } from '../lib/multiplayer';
@@ -7,8 +7,11 @@ import type { GameCategory, GameId } from '../types/game';
 
 interface LobbyProps {
   onSelectGame: (id: GameId) => void;
+  onStartOnline: (id: GameId) => void;
   onOpenRoom: (id: GameId, code: string) => void;
 }
+
+const ONLINE_GAMES = new Set<GameId>(['uno', 'chess', 'carrom', 'billiard']);
 
 const PHOTO_COVERS: Partial<Record<GameId, string>> = {
   uno: '/assets/covers/uno.jpg',
@@ -134,7 +137,7 @@ const GameCoverArtwork: React.FC<{ id: GameId; title: string; subtitle: string; 
   );
 };
 
-export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onOpenRoom }) => {
+export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onStartOnline, onOpenRoom }) => {
   const { stats, chips, sfx } = useGameStation();
   const [category, setCategory] = useState<GameCategory>('all');
   const [joinOpen, setJoinOpen] = useState(false);
@@ -175,8 +178,8 @@ export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onOpenRoom }) => {
       <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900/95 via-slate-900/80 to-indigo-950/60 p-6 sm:p-8 shadow-2xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-300">
-              <Sparkles className="w-3.5 h-3.5" /> 6 Game Siap Dimainkan dalam 1 Hub
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
+              <Sparkles className="w-3.5 h-3.5" /> Publik • Gratis • Tanpa Login — 6 Game Siap Dimainkan
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">
               Pilih Meja Favoritmu di{' '}
@@ -185,8 +188,8 @@ export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onOpenRoom }) => {
               </span>
             </h1>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-              Dari strategi papan seperti Catur, fisika presisi di Karambol &amp; Billiard, hingga keseruan kartu UNO,
-              Blackjack, dan Texas Hold&apos;em Poker — semua terhubung ke satu dompet chip virtual.
+              Semua 6 game langsung terbuka untuk publik! Mabar P2P 2–6 pemain bareng teman (UNO, Catur, Karambol,
+              Billiard multi-mode) atau atur jumlah musuh AI sesukamu — semua terhubung ke dompet chip virtual.
             </p>
           </div>
 
@@ -297,16 +300,30 @@ export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onOpenRoom }) => {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sfx('click');
-                      onSelectGame(game.id);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-xs sm:text-sm font-extrabold text-slate-950 hover:bg-indigo-100 btn-tactile cursor-pointer shadow"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" /> Mainkan
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {ONLINE_GAMES.has(game.id) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx('click');
+                          onStartOnline(game.id);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/50 bg-emerald-500/15 px-3 py-2 text-xs font-extrabold text-emerald-200 hover:bg-emerald-500/25 btn-tactile cursor-pointer"
+                      >
+                        <Globe className="w-3.5 h-3.5" /> Mabar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx('click');
+                        onSelectGame(game.id);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-xs sm:text-sm font-extrabold text-slate-950 hover:bg-indigo-100 btn-tactile cursor-pointer shadow"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" /> {ONLINE_GAMES.has(game.id) ? 'Main' : 'Mainkan'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

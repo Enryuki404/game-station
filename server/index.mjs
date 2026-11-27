@@ -23,8 +23,8 @@ const DIST_DIR = path.join(ROOT_DIR, 'dist');
 const PORT = Number(process.env.PORT || process.env.SERVER_PORT) || 3001;
 const MAX_PLAYERS = {
   chess: 2,
-  carrom: 2,
-  billiard: 2,
+  carrom: 4,
+  billiard: 4,
   uno: 6,
 };
 
@@ -324,37 +324,37 @@ io.on('connection', (socket) => {
   });
 
   // ---- KARAMBOL EVENTS ----
-  socket.on('carrom:striker', ({ code, x }) => {
+  socket.on('carrom:striker', ({ code, x, y }) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'carrom') return;
     const seatIdx = room.players.findIndex((p) => p.id === socket.id);
     if (seatIdx === -1 || seatIdx + 1 !== room.carromTurn) return;
-    socket.to(room.code).emit('carrom:striker', { x });
+    socket.to(room.code).emit('carrom:striker', { x, y });
   });
 
-  socket.on('carrom:shoot', ({ code, strikerX, vx, vy }) => {
+  socket.on('carrom:shoot', ({ code, strikerX, strikerY, vx, vy }) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'carrom') return;
     const seatIdx = room.players.findIndex((p) => p.id === socket.id);
     if (seatIdx === -1 || seatIdx + 1 !== room.carromTurn) return;
-    io.to(room.code).emit('carrom:shoot', { strikerX, vx, vy, shooterSeat: seatIdx });
+    io.to(room.code).emit('carrom:shoot', { strikerX, strikerY, vx, vy, shooterSeat: seatIdx });
   });
 
-  socket.on('carrom:sync', ({ code, bodies, turn, queenState, status, winner }) => {
+  socket.on('carrom:sync', ({ code, bodies, turn, queenState, status, winner, playerCount }) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'carrom') return;
     const seatIdx = room.players.findIndex((p) => p.id === socket.id);
     if (seatIdx === -1 || seatIdx + 1 !== room.carromTurn) return;
     room.carromTurn = turn;
-    socket.to(room.code).emit('carrom:sync', { bodies, turn, queenState, status, winner });
+    socket.to(room.code).emit('carrom:sync', { bodies, turn, queenState, status, winner, playerCount });
   });
 
-  socket.on('carrom:rematch', ({ code }) => {
+  socket.on('carrom:rematch', ({ code, playerCount }) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'carrom') return;
     if (!room.players.some((p) => p.id === socket.id)) return;
     room.carromTurn = 1;
-    io.to(room.code).emit('carrom:rematch');
+    io.to(room.code).emit('carrom:rematch', { playerCount });
   });
 
   // ---- BILLIARD EVENTS ----
@@ -382,21 +382,21 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('billiard:shoot', { vx, vy, shooterSeat: seatIdx });
   });
 
-  socket.on('billiard:sync', ({ code, balls, turn, group1, group2, ballInHand, status, winner }) => {
+  socket.on('billiard:sync', ({ code, balls, turn, group1, group2, ballInHand, status, winner, variant, scores, playerCount }) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'billiard') return;
     const seatIdx = room.players.findIndex((p) => p.id === socket.id);
     if (seatIdx === -1 || seatIdx + 1 !== room.billiardTurn) return;
     room.billiardTurn = turn;
-    socket.to(room.code).emit('billiard:sync', { balls, turn, group1, group2, ballInHand, status, winner });
+    socket.to(room.code).emit('billiard:sync', { balls, turn, group1, group2, ballInHand, status, winner, variant, scores, playerCount });
   });
 
-  socket.on('billiard:rematch', ({ code }) => {
+  socket.on('billiard:rematch', ({ code, variant, playerCount }) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'billiard') return;
     if (!room.players.some((p) => p.id === socket.id)) return;
     room.billiardTurn = 1;
-    io.to(room.code).emit('billiard:rematch');
+    io.to(room.code).emit('billiard:rematch', { variant, playerCount });
   });
 
   socket.on('disconnect', () => {

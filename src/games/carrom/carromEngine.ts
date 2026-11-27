@@ -22,8 +22,47 @@ export const CARROM_POCKETS: Pocket[] = [
 
 export const BASELINE_BOTTOM_Y = CARROM_SIZE - CARROM_BORDER - 72;
 export const BASELINE_TOP_Y = CARROM_BORDER + 72;
+export const BASELINE_LEFT_X = CARROM_BORDER + 72;
+export const BASELINE_RIGHT_X = CARROM_SIZE - CARROM_BORDER - 72;
 export const BASELINE_MIN_X = CARROM_BORDER + 96;
 export const BASELINE_MAX_X = CARROM_SIZE - CARROM_BORDER - 96;
+
+export type CarromSide = 'bottom' | 'right' | 'top' | 'left';
+
+export function getCarromSide(playerNum: number, playerCount: 2 | 4): CarromSide {
+  if (playerCount === 2) {
+    return playerNum === 1 ? 'bottom' : 'top';
+  }
+  switch (playerNum) {
+    case 1:
+      return 'bottom';
+    case 2:
+      return 'right';
+    case 3:
+      return 'top';
+    default:
+      return 'left';
+  }
+}
+
+export function getCarromTeam(playerNum: number): 1 | 2 {
+  return playerNum % 2 === 1 ? 1 : 2;
+}
+
+export function getBaselinePoint(side: CarromSide, t: number): { x: number; y: number } {
+  const clamped = Math.max(0, Math.min(1, t));
+  const span = BASELINE_MIN_X + clamped * (BASELINE_MAX_X - BASELINE_MIN_X);
+  switch (side) {
+    case 'bottom':
+      return { x: span, y: BASELINE_BOTTOM_Y };
+    case 'top':
+      return { x: span, y: BASELINE_TOP_Y };
+    case 'left':
+      return { x: BASELINE_LEFT_X, y: span };
+    case 'right':
+      return { x: BASELINE_RIGHT_X, y: span };
+  }
+}
 
 export function createCarromBodies(): PhysicsBody[] {
   const cx = CARROM_SIZE / 2;
@@ -69,7 +108,6 @@ export function createCarromBodies(): PhysicsBody[] {
   const ring2Dist = COIN_RADIUS * 4.15;
   for (let i = 0; i < 12; i++) {
     const angle = (i * Math.PI) / 6 - Math.PI / 2;
-    // Slight radial adjustment for hex packing on odd indices
     const r = i % 2 === 0 ? ring2Dist : ring2Dist * 0.9;
     const isWhite = i % 2 === 0;
     bodies.push({
@@ -129,6 +167,32 @@ export function findValidStrikerX(bodies: PhysicsBody[], preferredX: number, y: 
   return clamped;
 }
 
+export function findValidStrikerOnSide(
+  bodies: PhysicsBody[],
+  side: CarromSide,
+  preferredT = 0.5
+): { x: number; y: number; t: number } {
+  const clampedT = Math.max(0, Math.min(1, preferredT));
+  const pt = getBaselinePoint(side, clampedT);
+  if (isStrikerPositionValid(bodies, pt.x, pt.y)) {
+    return { x: pt.x, y: pt.y, t: clampedT };
+  }
+
+  for (let step = 0.02; step <= 1; step += 0.02) {
+    const tPlus = Math.min(1, clampedT + step);
+    const pPlus = getBaselinePoint(side, tPlus);
+    if (isStrikerPositionValid(bodies, pPlus.x, pPlus.y)) {
+      return { x: pPlus.x, y: pPlus.y, t: tPlus };
+    }
+    const tMinus = Math.max(0, clampedT - step);
+    const pMinus = getBaselinePoint(side, tMinus);
+    if (isStrikerPositionValid(bodies, pMinus.x, pMinus.y)) {
+      return { x: pMinus.x, y: pMinus.y, t: tMinus };
+    }
+  }
+  return { x: pt.x, y: pt.y, t: clampedT };
+}
+
 function segmentClear(
   bodies: PhysicsBody[],
   ax: number,
@@ -156,15 +220,15 @@ function segmentClear(
 
 export function computeCarromAiShot(
   bodies: PhysicsBody[],
-  targetKind: 'black' | 'white'
-): { strikerX: number; vx: number; vy: number } {
+  targetKind: 'black' | 'white',
+  side: CarromSide = 'top'
+): { strikerX: number; strikerY: number; vx: number; vy: number } {
   const targets = bodies.filter((b) => !b.pocketed && b.kind === targetKind);
-  const y = BASELINE_TOP_Y;
 
   let bestScore = -Infinity;
-  let bestShot: { strikerX: number; vx: number; vy: number } | null = null;
+  let bestShot: { strikerX: number; strikerY: number; vx: number; vy: number } | null = null;
 
-  const xCandidates = [180, 230, 280, 320, 360, 410, 460];
+  const tCandidates = [0.1, 0.24, 0.38, 0.5, 0.62, 0.76, 0.9];
 
   for (const coin of targets) {
     for (const pocket of CARROM_POCKETS) {
@@ -178,10 +242,11 @@ export function computeCarromAiShot(
       const contactX = coin.x - ux * (COIN_RADIUS + STRIKER_RADIUS);
       const contactY = coin.y - uy * (COIN_RADIUS + STRIKER_RADIUS);
 
-      for (const sx of xCandidates) {
-        if (!isStrikerPositionValid(bodies, sx, y)) continue;
-        const shotX = contactX - sx;
-        const shotY = contactY - y;
+      for (const tc of tCandidates) {
+        const sp = getBaselinePoint(side, tc);
+        if (!isStrikerPositionValid(bodies, sp.x, sp.y)) continue;
+        const shotX = contactX - sp.x;
+        const shotY = contactY - sp.y;
         const shotDist = Math.hypot(shotX, shotY) || 1;
         const sux = shotX / shotDist;
         const suy = shotY / shotDist;
@@ -192,14 +257,14 @@ export function computeCarromAiShot(
 
         const ignore = new Set(['striker', coin.id]);
         const pathClear =
-          segmentClear(bodies, sx, y, contactX, contactY, ignore, STRIKER_RADIUS * 0.85) &&
+          segmentClear(bodies, sp.x, sp.y, contactX, contactY, ignore, STRIKER_RADIUS * 0.85) &&
           segmentClear(bodies, coin.x, coin.y, pocket.x, pocket.y, ignore, COIN_RADIUS * 0.85);
 
         const score = dot * 120 - distToPocket * 0.14 - shotDist * 0.08 + (pathClear ? 90 : 0);
         if (score > bestScore) {
           bestScore = score;
           const speed = Math.min(20, Math.max(12.5, (shotDist + distToPocket) * 0.036));
-          bestShot = { strikerX: sx, vx: sux * speed, vy: suy * speed };
+          bestShot = { strikerX: sp.x, strikerY: sp.y, vx: sux * speed, vy: suy * speed };
         }
       }
     }
@@ -207,14 +272,13 @@ export function computeCarromAiShot(
 
   if (bestShot) return bestShot;
 
-  // Fallback: hit any target coin directly
-  const fallbackX = findValidStrikerX(bodies, CARROM_SIZE / 2, y);
+  const fallbackSpot = findValidStrikerOnSide(bodies, side, 0.5);
   const fallbackTarget = targets[0] ?? bodies.find((b) => !b.pocketed && b.kind !== 'striker');
   if (!fallbackTarget) {
-    return { strikerX: fallbackX, vx: 0, vy: 14 };
+    return { strikerX: fallbackSpot.x, strikerY: fallbackSpot.y, vx: 0, vy: side === 'top' ? 14 : -14 };
   }
-  const dx = fallbackTarget.x - fallbackX;
-  const dy = fallbackTarget.y - y;
+  const dx = fallbackTarget.x - fallbackSpot.x;
+  const dy = fallbackTarget.y - fallbackSpot.y;
   const d = Math.hypot(dx, dy) || 1;
-  return { strikerX: fallbackX, vx: (dx / d) * 15, vy: (dy / d) * 15 };
+  return { strikerX: fallbackSpot.x, strikerY: fallbackSpot.y, vx: (dx / d) * 15, vy: (dy / d) * 15 };
 }

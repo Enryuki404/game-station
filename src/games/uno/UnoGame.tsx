@@ -26,6 +26,7 @@ import {
 interface UnoGameProps {
   onBack: () => void;
   initialRoomCode?: string | null;
+  initialOnline?: boolean;
 }
 
 interface UnoState {
@@ -86,9 +87,11 @@ const COLOR_STYLES: Record<UnoColor, { bg: string; ring: string; pill: string }>
   },
 };
 
-function createInitialState(playerCount: 2 | 4): UnoState {
+function createInitialState(aiCount: number): UnoState {
   const deck = createUnoDeck();
-  const names = playerCount === 4 ? ['Kamu', 'Bot Raka', 'Bot Sinta', 'Bot Budi'] : ['Kamu', 'Bot Raka'];
+  const botNames = ['Bot Raka', 'Bot Sinta', 'Bot Budi', 'Bot Dewi', 'Bot Dimas'];
+  const clampedAi = Math.max(1, Math.min(5, aiCount));
+  const names = ['Kamu', ...botNames.slice(0, clampedAi)];
   const players: UnoPlayer[] = names.map((name, i) => ({
     id: `p-${i}`,
     name,
@@ -184,10 +187,12 @@ const UnoCardView: React.FC<{
   );
 };
 
-export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => {
+export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initialOnline }) => {
   const { addChips, recordGame, sfx } = useGameStation();
-  const [mode, setMode] = useState<'bot4' | 'bot2' | 'online'>(initialRoomCode ? 'online' : 'bot4');
-  const [state, setState] = useState<UnoState>(() => createInitialState(4));
+  const startInOnline = Boolean(initialRoomCode || initialOnline);
+  const [mode, setMode] = useState<'ai' | 'online'>(startInOnline ? 'online' : 'ai');
+  const [aiCount, setAiCount] = useState<number>(3);
+  const [state, setState] = useState<UnoState>(() => createInitialState(3));
   const [actionBurst, setActionBurst] = useState<{ id: number; text: string; tone: string } | null>(null);
   const [confettiKey, setConfettiKey] = useState(0);
 
@@ -196,7 +201,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
   const [onlineUno, setOnlineUno] = useState<OnlineUnoState | null>(null);
   const [onlineWildCard, setOnlineWildCard] = useState<UnoCard | null>(null);
   const [fillBots, setFillBots] = useState(true);
-  const [roomModalOpen, setRoomModalOpen] = useState(Boolean(initialRoomCode));
+  const [roomModalOpen, setRoomModalOpen] = useState(startInOnline);
 
   const rewardGrantedRef = useRef(false);
   const lastBurstIdRef = useRef<number | null>(null);
@@ -206,7 +211,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
   }, []);
 
   const resetGame = useCallback(
-    (nextMode: 'bot4' | 'bot2' | 'online' = mode) => {
+    (nextMode: 'ai' | 'online' = mode, nextAiCount: number = aiCount) => {
       rewardGrantedRef.current = false;
       setActionBurst(null);
       if (nextMode !== 'online') {
@@ -215,12 +220,12 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
           setOnlineSession(null);
           setOnlineUno(null);
         }
-        setState(createInitialState(nextMode === 'bot2' ? 2 : 4));
+        setState(createInitialState(nextAiCount));
       } else if (onlineSession && onlineSession.room.hostId === onlineSession.playerId) {
         getSocket().emit('uno:start', { code: onlineSession.code, fillBots });
       }
     },
-    [fillBots, mode, onlineSession]
+    [aiCount, fillBots, mode, onlineSession]
   );
 
   // Online socket listeners
@@ -533,27 +538,14 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
               type="button"
               onClick={() => {
                 sfx('click');
-                setMode('bot4');
-                resetGame('bot4');
+                setMode('ai');
+                resetGame('ai', aiCount);
               }}
               className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition ${
-                mode === 'bot4' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
               }`}
             >
-              <Users className="w-3.5 h-3.5" /> 4P Bot
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
-                setMode('bot2');
-                resetGame('bot2');
-              }}
-              className={`px-2.5 py-1 rounded-lg font-semibold cursor-pointer transition ${
-                mode === 'bot2' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              2P Bot
+              <Users className="w-3.5 h-3.5" /> vs AI
             </button>
             <button
               type="button"
@@ -569,6 +561,28 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode }) => 
               <Globe className="w-3.5 h-3.5" /> Online
             </button>
           </div>
+
+          {mode === 'ai' && (
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-xs">
+              <span className="text-slate-400 font-semibold pr-1">Musuh AI:</span>
+              {[1, 2, 3, 4, 5].map((cnt) => (
+                <button
+                  key={cnt}
+                  type="button"
+                  onClick={() => {
+                    sfx('click');
+                    setAiCount(cnt);
+                    resetGame('ai', cnt);
+                  }}
+                  className={`px-2 py-1 rounded-lg font-bold cursor-pointer ${
+                    aiCount === cnt ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {cnt}
+                </button>
+              ))}
+            </div>
+          )}
 
           {mode === 'online' && (
             <button

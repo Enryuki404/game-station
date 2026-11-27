@@ -21,8 +21,8 @@ export interface MultiplayerClient {
 const PEER_PREFIX = 'gs404-room-';
 const MAX_PLAYERS: Record<MultiplayerGameId, number> = {
   chess: 2,
-  carrom: 2,
-  billiard: 2,
+  carrom: 4,
+  billiard: 4,
   uno: 6,
 };
 
@@ -81,8 +81,8 @@ interface HostRoomState {
   chess: Chess | null;
   uno: HostUnoState | null;
   unoBotTimer: number | null;
-  carromTurn: 1 | 2;
-  billiardTurn: 1 | 2;
+  carromTurn: number;
+  billiardTurn: number;
 }
 
 type EventListener = (...args: any[]) => void;
@@ -624,7 +624,7 @@ function handleRoomAction(
       if (room.gameId !== 'carrom') return;
       const seatIdx = room.players.findIndex((p) => p.id === senderId);
       if (seatIdx === -1 || seatIdx + 1 !== room.carromTurn) return;
-      broadcastEvent(room, 'carrom:striker', { x: payload.x }, senderId);
+      broadcastEvent(room, 'carrom:striker', { x: payload.x, y: payload.y }, senderId);
       return;
     }
 
@@ -634,6 +634,7 @@ function handleRoomAction(
       if (seatIdx === -1 || seatIdx + 1 !== room.carromTurn) return;
       broadcastEvent(room, 'carrom:shoot', {
         strikerX: payload.strikerX,
+        strikerY: payload.strikerY,
         vx: payload.vx,
         vy: payload.vy,
         shooterSeat: seatIdx,
@@ -655,6 +656,7 @@ function handleRoomAction(
           queenState: payload.queenState,
           status: payload.status,
           winner: payload.winner,
+          playerCount: payload.playerCount,
         },
         senderId
       );
@@ -665,7 +667,7 @@ function handleRoomAction(
       if (room.gameId !== 'carrom') return;
       if (!room.players.some((p) => p.id === senderId)) return;
       room.carromTurn = 1;
-      broadcastEvent(room, 'carrom:rematch');
+      broadcastEvent(room, 'carrom:rematch', { playerCount: payload?.playerCount });
       return;
     }
 
@@ -719,6 +721,9 @@ function handleRoomAction(
           ballInHand: payload.ballInHand,
           status: payload.status,
           winner: payload.winner,
+          variant: payload.variant,
+          scores: payload.scores,
+          playerCount: payload.playerCount,
         },
         senderId
       );
@@ -729,7 +734,10 @@ function handleRoomAction(
       if (room.gameId !== 'billiard') return;
       if (!room.players.some((p) => p.id === senderId)) return;
       room.billiardTurn = 1;
-      broadcastEvent(room, 'billiard:rematch');
+      broadcastEvent(room, 'billiard:rematch', {
+        variant: payload?.variant,
+        playerCount: payload?.playerCount,
+      });
       return;
     }
   }

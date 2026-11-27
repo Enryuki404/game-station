@@ -50,14 +50,18 @@ export function createPokerHand(
   prevPlayers: PokerPlayer[] | null,
   dealerIdx: number,
   smallBlind: number,
-  bigBlind: number
+  bigBlind: number,
+  aiCount = 3
 ): PokerState {
   const deck = shuffleDeck(createDeck(1));
   const aiTemplates = [
     { id: 'ai-1', name: 'Raka', aggression: 0.62 },
     { id: 'ai-2', name: 'Sinta', aggression: 0.38 },
     { id: 'ai-3', name: 'Budi', aggression: 0.75 },
+    { id: 'ai-4', name: 'Dewi', aggression: 0.48 },
+    { id: 'ai-5', name: 'Dimas', aggression: 0.68 },
   ];
+  const activeAis = aiTemplates.slice(0, Math.max(1, Math.min(5, aiCount)));
 
   const players: PokerPlayer[] = [
     {
@@ -73,8 +77,8 @@ export function createPokerHand(
       actedThisStreet: false,
       aggression: 0.5,
     },
-    ...aiTemplates.map((tpl, idx) => {
-      const prevChips = prevPlayers?.[idx + 1]?.chips ?? 10000;
+    ...activeAis.map((tpl) => {
+      const prevChips = prevPlayers?.find((p) => p.id === tpl.id)?.chips ?? 10000;
       const rebuyChips = prevChips < bigBlind * 4 ? 10000 : prevChips;
       return {
         id: tpl.id,
@@ -93,8 +97,9 @@ export function createPokerHand(
   ];
 
   const n = players.length;
-  const sbIdx = (dealerIdx + 1) % n;
-  const bbIdx = (dealerIdx + 2) % n;
+  const safeDealer = ((dealerIdx % n) + n) % n;
+  const sbIdx = n === 2 ? safeDealer : (safeDealer + 1) % n;
+  const bbIdx = (sbIdx + 1) % n;
 
   const postBlind = (idx: number, amount: number, label: string): number => {
     const p = players[idx];

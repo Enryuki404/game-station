@@ -17,6 +17,7 @@ import { pickChessAiMove, type ChessDifficulty } from './chessAI';
 interface ChessGameProps {
   onBack: () => void;
   initialRoomCode?: string | null;
+  initialOnline?: boolean;
 }
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
@@ -24,10 +25,11 @@ const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'] as const;
 
 const PIECE_WEIGHT: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
-export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode }) => {
+export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, initialOnline }) => {
   const { addChips, recordGame, sfx } = useGameStation();
+  const startInOnline = Boolean(initialRoomCode || initialOnline);
   const [fen, setFen] = useState(() => new Chess().fen());
-  const [mode, setMode] = useState<'ai' | 'local' | 'online'>(initialRoomCode ? 'online' : 'ai');
+  const [mode, setMode] = useState<'ai' | 'local' | 'online'>(startInOnline ? 'online' : 'ai');
   const [humanColor, setHumanColor] = useState<Color>('w');
   const [difficulty, setDifficulty] = useState<ChessDifficulty>('medium');
   const [flipped, setFlipped] = useState(false);
@@ -43,7 +45,7 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode })
 
   // Online multiplayer state
   const [onlineSession, setOnlineSession] = useState<OnlineSession | null>(null);
-  const [roomModalOpen, setRoomModalOpen] = useState(Boolean(initialRoomCode));
+  const [roomModalOpen, setRoomModalOpen] = useState(startInOnline);
   const [roomNotice, setRoomNotice] = useState<string | null>(null);
 
   const moveSeqRef = useRef(0);
