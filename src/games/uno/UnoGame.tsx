@@ -538,19 +538,6 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               type="button"
               onClick={() => {
                 sfx('click');
-                setMode('ai');
-                resetGame('ai', aiCount);
-              }}
-              className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition ${
-                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" /> vs AI
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
                 setMode('online');
                 setRoomModalOpen(true);
               }}
@@ -559,6 +546,19 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               }`}
             >
               <Globe className="w-3.5 h-3.5" /> Online
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                sfx('click');
+                setMode('ai');
+                resetGame('ai', aiCount);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition ${
+                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" /> vs AI
             </button>
           </div>
 

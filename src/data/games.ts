@@ -19,7 +19,7 @@ export const GAMES: GameMeta[] = [
     title: 'Catur Master',
     subtitle: 'Strategi Papan Klasik',
     category: 'board',
-    modes: ['Online 1v1', 'vs AI (3 Level)', '2P Lokal'],
+    modes: ['Online 1v1', 'vs AI (3 Level)'],
     description:
       'Aturan catur penuh termasuk Rokade, En Passant, dan Promosi Pion melawan AI Minimax atau teman secara online.',
     accentFrom: 'from-indigo-500',

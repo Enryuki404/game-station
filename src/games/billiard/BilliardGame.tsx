@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Cpu, Globe, Trophy, Users } from 'lucide-react';
+import { Cpu, Globe, Trophy } from 'lucide-react';
 import { ConfettiBurst } from '../../components/ConfettiBurst';
 import { GameShell } from '../../components/GameShell';
 import { OnlineRoomModal } from '../../components/OnlineRoomModal';
@@ -102,8 +102,8 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
   const variantRef = useRef<BilliardVariant>('8ball');
   const [variant, setVariant] = useState<BilliardVariant>('8ball');
 
-  const modeRef = useRef<'ai' | 'local' | 'online'>(startInOnline ? 'online' : 'ai');
-  const [mode, setMode] = useState<'ai' | 'local' | 'online'>(startInOnline ? 'online' : 'ai');
+  const modeRef = useRef<'ai' | 'online'>(startInOnline ? 'online' : 'ai');
+  const [mode, setMode] = useState<'ai' | 'online'>(startInOnline ? 'online' : 'ai');
 
   const [aiCount, setAiCount] = useState<1 | 2 | 3>(1);
   const playerCountRef = useRef<number>(2);
@@ -523,9 +523,7 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
       if (!rewardRef.current) {
         rewardRef.current = true;
         let humanWon = false;
-        if (modeRef.current === 'local') {
-          humanWon = true;
-        } else if (modeRef.current === 'online') {
+        if (modeRef.current === 'online') {
           const mySeat = (onlineSess?.seatIdx ?? 0) + 1;
           if (v === '8ball' && count === 4) {
             humanWon = winner === (mySeat % 2 === 1 ? 1 : 2);
@@ -537,15 +535,12 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
         }
 
         recordGame('billiard', humanWon);
-        if ((modeRef.current === 'ai' || modeRef.current === 'online') && humanWon) {
+        if (humanWon) {
           addChips(600);
           setConfettiKey((k) => k + 1);
           sfx('win');
-        } else if (modeRef.current === 'ai' || modeRef.current === 'online') {
-          sfx('lose');
         } else {
-          setConfettiKey((k) => k + 1);
-          sfx('win');
+          sfx('lose');
         }
       }
       syncHud(reason, winner);
@@ -976,7 +971,7 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
   }, [drawTable, finishTurn, sfx, syncHud]);
 
   const resetGame = useCallback(
-    (nextMode?: 'ai' | 'local' | 'online', nextVariant?: BilliardVariant, nextPlayerCount?: number) => {
+    (nextMode?: 'ai' | 'online', nextVariant?: BilliardVariant, nextPlayerCount?: number) => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current);
 
@@ -1269,8 +1264,7 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
   const canInteract =
     !hud.isMoving &&
     hud.winner === null &&
-    (mode === 'local' ||
-      (mode === 'ai' && hud.turn === 1) ||
+    ((mode === 'ai' && hud.turn === 1) ||
       (mode === 'online' &&
         Boolean(onlineSession && onlineSession.room.players.length >= 2) &&
         hud.turn === (onlineSession?.seatIdx ?? 0) + 1));
@@ -1447,31 +1441,6 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
               type="button"
               onClick={() => {
                 sfx('click');
-                const cnt = variant === 'cutthroat' ? 3 : variant === '8ball' ? (aiCount === 3 ? 4 : 2) : aiCount + 1;
-                resetGame('ai', variant, cnt);
-              }}
-              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
-                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300'
-              }`}
-            >
-              <Cpu className="w-3.5 h-3.5" /> vs AI
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
-                resetGame('local', variant, variant === 'cutthroat' ? 3 : playerCount);
-              }}
-              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
-                mode === 'local' ? 'bg-indigo-600 text-white' : 'text-slate-300'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" /> Lokal
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
                 modeRef.current = 'online';
                 setMode('online');
                 setRoomModalOpen(true);
@@ -1481,6 +1450,19 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
               }`}
             >
               <Globe className="w-3.5 h-3.5" /> Online
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                sfx('click');
+                const cnt = variant === 'cutthroat' ? 3 : variant === '8ball' ? (aiCount === 3 ? 4 : 2) : aiCount + 1;
+                resetGame('ai', variant, cnt);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
+                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" /> vs AI
             </button>
           </div>
 
@@ -1502,27 +1484,6 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
                   }`}
                 >
                   {variant === '8ball' ? (cnt === 1 ? '1 AI (1v1)' : '3 AI (2v2)') : `${cnt} AI`}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Local Player Count Picker */}
-          {mode === 'local' && variant !== 'cutthroat' && (
-            <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs">
-              {(variant === '8ball' ? ([2, 4] as const) : ([2, 3, 4] as const)).map((cnt) => (
-                <button
-                  key={cnt}
-                  type="button"
-                  onClick={() => {
-                    sfx('click');
-                    resetGame('local', variant, cnt);
-                  }}
-                  className={`px-2 py-1 rounded-lg font-bold cursor-pointer ${
-                    playerCount === cnt ? 'bg-emerald-400 text-slate-950' : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  {cnt === 4 && variant === '8ball' ? '4P (2v2)' : `${cnt}P`}
                 </button>
               ))}
             </div>

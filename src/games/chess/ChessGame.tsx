@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chess, type Color, type Move, type PieceSymbol, type Square } from 'chess.js';
-import { ArrowLeftRight, Cpu, Globe, Undo2, Users } from 'lucide-react';
+import { ArrowLeftRight, Cpu, Globe, Undo2 } from 'lucide-react';
 import { ConfettiBurst } from '../../components/ConfettiBurst';
 import { GameShell } from '../../components/GameShell';
 import { OnlineRoomModal } from '../../components/OnlineRoomModal';
@@ -29,11 +29,10 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
   const { addChips, recordGame, sfx } = useGameStation();
   const startInOnline = Boolean(initialRoomCode || initialOnline);
   const [fen, setFen] = useState(() => new Chess().fen());
-  const [mode, setMode] = useState<'ai' | 'local' | 'online'>(startInOnline ? 'online' : 'ai');
+  const [mode, setMode] = useState<'ai' | 'online'>(startInOnline ? 'online' : 'ai');
   const [humanColor, setHumanColor] = useState<Color>('w');
   const [difficulty, setDifficulty] = useState<ChessDifficulty>('medium');
   const [flipped, setFlipped] = useState(false);
-  const [autoFlip, setAutoFlip] = useState(true);
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
   const [history, setHistory] = useState<Move[]>([]);
@@ -49,7 +48,6 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
   const [roomNotice, setRoomNotice] = useState<string | null>(null);
 
   const moveSeqRef = useRef(0);
-  const flipTimerRef = useRef<number | null>(null);
   const recordedRef = useRef(false);
   const flippedRef = useRef(flipped);
   flippedRef.current = flipped;
@@ -129,11 +127,7 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
   }, []);
 
   const resetGame = useCallback(
-    (nextMode: 'ai' | 'local' | 'online' = mode, nextHumanColor: Color = humanColor) => {
-      if (flipTimerRef.current !== null) {
-        window.clearTimeout(flipTimerRef.current);
-        flipTimerRef.current = null;
-      }
+    (nextMode: 'ai' | 'online' = mode, nextHumanColor: Color = humanColor) => {
       if (nextMode === 'online' && onlineSession) {
         getSocket().emit('chess:rematch', { code: onlineSession.code });
         return;
@@ -155,12 +149,6 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
     },
     [humanColor, mode, onlineSession]
   );
-
-  useEffect(() => {
-    return () => {
-      if (flipTimerRef.current !== null) window.clearTimeout(flipTimerRef.current);
-    };
-  }, []);
 
   // Online socket listeners
   useEffect(() => {
@@ -237,21 +225,12 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
         setPendingPromotion(null);
         sfx(move.captured ? 'chessCapture' : 'chess');
 
-        if (mode === 'local' && autoFlip && !next.isGameOver()) {
-          if (flipTimerRef.current !== null) window.clearTimeout(flipTimerRef.current);
-          const nextIsBlack = next.turn() === 'b';
-          flipTimerRef.current = window.setTimeout(() => {
-            setFlipped(nextIsBlack);
-            flipTimerRef.current = null;
-          }, 280);
-        }
-
         return true;
       } catch {
         return false;
       }
     },
-    [autoFlip, fen, flipped, mode, onlineSession, sfx, triggerMoveAnimation]
+    [fen, flipped, mode, onlineSession, sfx, triggerMoveAnimation]
   );
 
   useEffect(() => {
@@ -268,17 +247,14 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
     if (gameOver && !recordedRef.current) {
       recordedRef.current = true;
       if (chess.isCheckmate()) {
-        const humanWon = mode === 'local' || chess.turn() !== activePlayerColor;
+        const humanWon = chess.turn() !== activePlayerColor;
         recordGame('chess', humanWon);
-        if ((mode === 'ai' || mode === 'online') && humanWon) {
+        if (humanWon) {
           addChips(600);
           setConfettiKey((k) => k + 1);
           sfx('win');
-        } else if (mode === 'ai' || mode === 'online') {
-          sfx('lose');
         } else {
-          setConfettiKey((k) => k + 1);
-          sfx('win');
+          sfx('lose');
         }
       } else {
         recordGame('chess', false);
@@ -338,10 +314,6 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
   const handleUndo = () => {
     if (mode === 'online' || aiThinking || history.length === 0) return;
     sfx('click');
-    if (flipTimerRef.current !== null) {
-      window.clearTimeout(flipTimerRef.current);
-      flipTimerRef.current = null;
-    }
     const stepsBack = mode === 'ai' && chess.turn() === humanColor && history.length >= 2 ? 2 : 1;
     const nextHistory = history.slice(0, history.length - stepsBack);
     const replay = new Chess();
@@ -352,9 +324,6 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
     setFen(replay.fen());
     setHistory(nextHistory);
     setSelectedSquare(null);
-    if (mode === 'local' && autoFlip) {
-      setFlipped(replay.turn() === 'b');
-    }
     const prevLast = nextHistory[nextHistory.length - 1];
     setLastMove(prevLast ? { from: prevLast.from, to: prevLast.to } : null);
   };
@@ -447,32 +416,6 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
               type="button"
               onClick={() => {
                 sfx('click');
-                setMode('ai');
-                resetGame('ai', humanColor);
-              }}
-              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
-                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300'
-              }`}
-            >
-              <Cpu className="w-3.5 h-3.5" /> vs AI
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
-                setMode('local');
-                resetGame('local', humanColor);
-              }}
-              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
-                mode === 'local' ? 'bg-indigo-600 text-white' : 'text-slate-300'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" /> 2P Lokal
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
                 setMode('online');
                 setRoomModalOpen(true);
               }}
@@ -481,6 +424,19 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
               }`}
             >
               <Globe className="w-3.5 h-3.5" /> Online
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                sfx('click');
+                setMode('ai');
+                resetGame('ai', humanColor);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
+                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" /> vs AI
             </button>
           </div>
 
@@ -492,7 +448,7 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
             >
               {onlineSession ? `Room: ${onlineSession.code} (${onlineSession.room.players.length}/2)` : 'Buat / Gabung Room'}
             </button>
-          ) : mode === 'ai' ? (
+          ) : (
             <>
               <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs">
                 <button
@@ -532,30 +488,13 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
                 <option value="hard">AI: Sulit</option>
               </select>
             </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
-                const nextAuto = !autoFlip;
-                setAutoFlip(nextAuto);
-                if (nextAuto) setFlipped(chess.turn() === 'b');
-              }}
-              className={`rounded-xl border px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition ${
-                autoFlip
-                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
-                  : 'border-slate-700 bg-slate-800 text-slate-300'
-              }`}
-            >
-              Auto-Putar: {autoFlip ? 'Aktif' : 'Mati'}
-            </button>
           )}
         </div>
       }
       rules={[
         'Klik bidak untuk melihat langkah legal (titik hijau = kotak kosong, cincin = tangkap bidak lawan).',
         'Mode Online (Mabar): Buat Room dan bagikan Kode / Link Invite ke temanmu. Layar P1 selalu Putih di bawah, layar P2 selalu Hitam di bawah!',
-        'Mode 2P Lokal mendukung Auto-Putar 180° setiap giliran berpindah.',
+        'Mode vs AI menyediakan 3 tingkat kesulitan (Mudah, Sedang, Sulit) serta pilihan Putih atau Hitam.',
         'Menang Skakmat melawan AI atau lawan Online memberikan hadiah +600 Chip.',
       ]}
     >
@@ -677,8 +616,7 @@ export const ChessGame: React.FC<ChessGameProps> = ({ onBack, initialRoomCode, i
                           !gameOver &&
                           !aiThinking &&
                           piece.color === chess.turn() &&
-                          (mode === 'local' ||
-                            (mode === 'ai' && chess.turn() === humanColor) ||
+                          ((mode === 'ai' && chess.turn() === humanColor) ||
                             (mode === 'online' &&
                               Boolean(onlineSession && onlineSession.room.players.length >= 2) &&
                               chess.turn() === onlineMyColor));

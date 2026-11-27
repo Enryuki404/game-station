@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Cpu, Globe, Trophy, Users } from 'lucide-react';
+import { Cpu, Globe, Trophy } from 'lucide-react';
 import { ConfettiBurst } from '../../components/ConfettiBurst';
 import { GameShell } from '../../components/GameShell';
 import { OnlineRoomModal } from '../../components/OnlineRoomModal';
@@ -66,11 +66,10 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
   const bodiesRef = useRef<PhysicsBody[]>(createCarromBodies());
 
   const startInOnline = Boolean(initialRoomCode || initialOnline);
-  const modeRef = useRef<'ai' | 'local' | 'online'>(startInOnline ? 'online' : 'ai');
-  const [mode, setMode] = useState<'ai' | 'local' | 'online'>(startInOnline ? 'online' : 'ai');
+  const modeRef = useRef<'ai' | 'online'>(startInOnline ? 'online' : 'ai');
+  const [mode, setMode] = useState<'ai' | 'online'>(startInOnline ? 'online' : 'ai');
   const [aiCount, setAiCount] = useState<1 | 3>(1);
   const playerCountRef = useRef<2 | 4>(2);
-  const [playerCount, setPlayerCount] = useState<2 | 4>(2);
 
   const [onlineSession, setOnlineSession] = useState<OnlineSession | null>(null);
   const onlineSessionRef = useRef<OnlineSession | null>(null);
@@ -640,17 +639,14 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
 
       if (!rewardRef.current) {
         rewardRef.current = true;
-        const humanWon = modeRef.current === 'local' || myTeam === winnerTeam;
+        const humanWon = myTeam === winnerTeam;
         recordGame('carrom', humanWon);
-        if ((modeRef.current === 'ai' || modeRef.current === 'online') && humanWon) {
+        if (humanWon) {
           addChips(500);
           setConfettiKey((k) => k + 1);
           sfx('win');
-        } else if (modeRef.current === 'ai' || modeRef.current === 'online') {
-          sfx('lose');
         } else {
-          setConfettiKey((k) => k + 1);
-          sfx('win');
+          sfx('lose');
         }
       }
 
@@ -777,7 +773,7 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
   }, [drawBoard, finishTurn, sfx, syncHud]);
 
   const resetGame = useCallback(
-    (nextMode?: 'ai' | 'local' | 'online', nextCount?: 2 | 4) => {
+    (nextMode?: 'ai' | 'online', nextCount?: 2 | 4) => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current);
       const targetMode = nextMode ?? modeRef.current;
@@ -796,7 +792,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
         }
       }
       playerCountRef.current = targetCount;
-      setPlayerCount(targetCount);
 
       rewardRef.current = false;
       bodiesRef.current = createCarromBodies();
@@ -830,7 +825,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       setOnlineSession((prev) => (prev ? { ...prev, room: payload.room } : prev));
       if (payload.room.players.length > 2 && playerCountRef.current !== 4) {
         playerCountRef.current = 4;
-        setPlayerCount(4);
         drawBoard();
       }
     };
@@ -876,7 +870,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       movingRef.current = false;
       if (payload.playerCount) {
         playerCountRef.current = payload.playerCount;
-        setPlayerCount(payload.playerCount);
       }
       bodiesRef.current = payload.bodies;
       turnRef.current = payload.turn;
@@ -902,7 +895,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       rewardRef.current = false;
       if (payload?.playerCount) {
         playerCountRef.current = payload.playerCount;
-        setPlayerCount(payload.playerCount);
       }
       bodiesRef.current = createCarromBodies();
       turnRef.current = 1;
@@ -1044,8 +1036,7 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
   const canHumanInteract =
     !hud.isMoving &&
     hud.winner === null &&
-    (mode === 'local' ||
-      (mode === 'ai' && hud.turn === 1) ||
+    ((mode === 'ai' && hud.turn === 1) ||
       (mode === 'online' &&
         Boolean(onlineSession && onlineSession.room.players.length >= 2) &&
         hud.turn === (onlineSession?.seatIdx ?? 0) + 1));
@@ -1147,7 +1138,7 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
   return (
     <GameShell
       title="Karambol Pro"
-      subtitle="Papan statis klasik — 1v1, 4P (2v2 Tim), vs 1–3 AI, & Mabar Online"
+      subtitle="Papan statis klasik — Mabar Online 2–4P atau vs 1–3 AI"
       onBack={() => {
         leaveOnlineRoom();
         onBack();
@@ -1156,30 +1147,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       controls={
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
-                resetGame('ai', aiCount === 3 ? 4 : 2);
-              }}
-              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
-                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300'
-              }`}
-            >
-              <Cpu className="w-3.5 h-3.5" /> vs AI
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sfx('click');
-                resetGame('local', playerCount);
-              }}
-              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
-                mode === 'local' ? 'bg-indigo-600 text-white' : 'text-slate-300'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" /> Lokal
-            </button>
             <button
               type="button"
               onClick={() => {
@@ -1193,6 +1160,18 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
               }`}
             >
               <Globe className="w-3.5 h-3.5" /> Online
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                sfx('click');
+                resetGame('ai', aiCount === 3 ? 4 : 2);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
+                mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" /> vs AI
             </button>
           </div>
 
@@ -1213,26 +1192,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
                   }`}
                 >
                   {cnt === 1 ? '1 AI (1v1)' : '3 AI (4P 2v2)'}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {mode === 'local' && (
-            <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs">
-              {([2, 4] as const).map((cnt) => (
-                <button
-                  key={cnt}
-                  type="button"
-                  onClick={() => {
-                    sfx('click');
-                    resetGame('local', cnt);
-                  }}
-                  className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer ${
-                    playerCount === cnt ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  {cnt === 2 ? '2P' : '4P (2v2)'}
                 </button>
               ))}
             </div>
