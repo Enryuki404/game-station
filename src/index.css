@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #090d16;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.14), transparent),
+      radial-gradient(ellipse 60% 40% at 90% 100%, rgba(16, 185, 129, 0.08), transparent);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .font-mono-num {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.92) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes viewEnter {
+  0% { opacity: 0; transform: translateY(10px) scale(0.985); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cardDeal {
+  0% { opacity: 0; transform: translateY(-16px) scale(0.88) rotate(-3deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+}
+
+@keyframes cardThrow {
+  0% { opacity: 0.4; transform: scale(1.18) rotate(-9deg) translateY(-10px); }
+  65% { transform: scale(0.97) rotate(2deg) translateY(0); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg) translateY(0); }
+}
+
+@keyframes chipFloat {
+  0% { opacity: 0; transform: translateY(4px) scale(0.9); }
+  20% { opacity: 1; transform: translateY(-4px) scale(1); }
+  75% { opacity: 1; transform: translateY(-12px) scale(1); }
+  100% { opacity: 0; transform: translateY(-22px) scale(0.95); }
+}
+
+@keyframes bannerPop {
+  0% { opacity: 0; transform: scale(0.65) translateY(8px); }
+  22% { opacity: 1; transform: scale(1.08) translateY(-2px); }
+  75% { opacity: 1; transform: scale(1) translateY(-4px); }
+  100% { opacity: 0; transform: scale(0.92) translateY(-16px); }
+}
+
+@keyframes ambientDrift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(28px, -18px, 0) scale(1.06); }
+  66% { transform: translate3d(-22px, 16px, 0) scale(0.96); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.45); }
+  50% { box-shadow: 0 0 24px 4px rgba(250, 204, 21, 0.35); }
+}
+
+@keyframes potPulse {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.09); }
+  100% { transform: scale(1); }
+}
+
+@keyframes chessGlide {
+  0% { transform: translate3d(var(--from-x, 0%), var(--from-y, 0%), 0) scale(1.06); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes captureFade {
+  0% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.42); }
+}
+
+@keyframes cardFlipReveal {
+  0% { opacity: 0.5; transform: perspective(600px) rotateY(88deg) scale(0.94); }
+  100% { opacity: 1; transform: perspective(600px) rotateY(0deg) scale(1); }
+}
+
+.animate-chess-glide {
+  animation: chessGlide 230ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform;
+}
+
+.animate-capture-fade {
+  animation: captureFade 220ms ease-out forwards;
+}
+
+.animate-card-flip {
+  animation: cardFlipReveal 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-pop-in {
+  animation: popIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-view-enter {
+  animation: viewEnter 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-card-deal {
+  animation: cardDeal 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-card-throw {
+  animation: cardThrow 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-chip-float {
+  animation: chipFloat 1.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-banner-pop {
+  animation: bannerPop 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-ambient-drift {
+  animation: ambientDrift 18s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 3.6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 1.8s ease-in-out infinite;
+}
+
+.animate-pot-pulse {
+  animation: potPulse 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-tactile {
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), filter 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.btn-tactile:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.felt-surface {
+  background-color: #0b3f2b;
+  background-image:
+    radial-gradient(circle at 50% 35%, rgba(18, 91, 63, 0.88) 0%, rgba(11, 63, 43, 0.92) 58%, rgba(7, 44, 30, 0.96) 100%),
+    url('/assets/textures/felt_weave.jpg');
+  background-size: cover, 280px 280px;
+  background-blend-mode: soft-light, normal;
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.wood-frame {
+  background-color: #3a2010;
+  background-image:
+    linear-gradient(145deg, rgba(75, 43, 24, 0.72), rgba(35, 18, 8, 0.85)),
+    url('/assets/textures/dark_wood.jpg');
+  background-size: cover, 320px 320px;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.65),
+    inset 0 1px 1px rgba(255, 210, 170, 0.15);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
