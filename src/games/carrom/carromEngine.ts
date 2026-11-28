@@ -1,10 +1,10 @@
-import type { PhysicsBody, Pocket, TableBounds } from '../../engine/physics2d';
+import { raycastCircle, type CircleRaycastHit, type PhysicsBody, type Pocket, type TableBounds } from '../../engine/physics2d';
 
 export const CARROM_SIZE = 640;
 export const CARROM_BORDER = 42;
 export const COIN_RADIUS = 13.5;
 export const STRIKER_RADIUS = 18.5;
-export const POCKET_RADIUS = 24;
+export const POCKET_RADIUS = 24.5;
 
 export const CARROM_BOUNDS: TableBounds = {
   left: CARROM_BORDER,
@@ -14,11 +14,20 @@ export const CARROM_BOUNDS: TableBounds = {
 };
 
 export const CARROM_POCKETS: Pocket[] = [
-  { x: CARROM_BORDER + POCKET_RADIUS - 2, y: CARROM_BORDER + POCKET_RADIUS - 2, radius: POCKET_RADIUS },
-  { x: CARROM_SIZE - CARROM_BORDER - POCKET_RADIUS + 2, y: CARROM_BORDER + POCKET_RADIUS - 2, radius: POCKET_RADIUS },
-  { x: CARROM_BORDER + POCKET_RADIUS - 2, y: CARROM_SIZE - CARROM_BORDER - POCKET_RADIUS + 2, radius: POCKET_RADIUS },
-  { x: CARROM_SIZE - CARROM_BORDER - POCKET_RADIUS + 2, y: CARROM_SIZE - CARROM_BORDER - POCKET_RADIUS + 2, radius: POCKET_RADIUS },
+  { x: CARROM_BORDER + 23, y: CARROM_BORDER + 23, radius: POCKET_RADIUS },
+  { x: CARROM_SIZE - CARROM_BORDER - 23, y: CARROM_BORDER + 23, radius: POCKET_RADIUS },
+  { x: CARROM_BORDER + 23, y: CARROM_SIZE - CARROM_BORDER - 23, radius: POCKET_RADIUS },
+  { x: CARROM_SIZE - CARROM_BORDER - 23, y: CARROM_SIZE - CARROM_BORDER - 23, radius: POCKET_RADIUS },
 ];
+
+export function raycastCarromAim(
+  bodies: PhysicsBody[],
+  striker: PhysicsBody,
+  ux: number,
+  uy: number
+): CircleRaycastHit {
+  return raycastCircle(bodies, striker, ux, uy, CARROM_BOUNDS);
+}
 
 export const BASELINE_BOTTOM_Y = CARROM_SIZE - CARROM_BORDER - 72;
 export const BASELINE_TOP_Y = CARROM_BORDER + 72;

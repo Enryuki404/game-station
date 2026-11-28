@@ -7,6 +7,7 @@ export type SfxType =
   | 'clack'
   | 'wood'
   | 'pocket'
+  | 'cushion'
   | 'uno'
   | 'win'
   | 'lose'
@@ -124,7 +125,8 @@ export function playSfx(type: SfxType, enabled = true): void {
   if (!enabled) return;
   try {
     const now = performance.now();
-    const cooldown = type === 'clack' || type === 'wood' ? 45 : type === 'chip' ? 28 : 0;
+    const cooldown =
+      type === 'clack' || type === 'wood' ? 45 : type === 'cushion' ? 50 : type === 'chip' ? 28 : 0;
     if (cooldown > 0 && now - (lastPlayedAt[type] ?? 0) < cooldown) {
       return;
     }
@@ -162,6 +164,9 @@ export function playSfx(type: SfxType, enabled = true): void {
       case 'pocket':
         playTone(ctx, 240, 110, 0.16, 'sine', 0.13);
         playTone(ctx, 480, 320, 0.12, 'triangle', 0.055, 0.04);
+        break;
+      case 'cushion':
+        playTone(ctx, 165, 68, 0.055, 'sine', 0.085);
         break;
       case 'uno':
         playTone(ctx, 523.25, 523.25, 0.09, 'square', 0.06, 0);

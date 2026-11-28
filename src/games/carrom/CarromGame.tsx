@@ -10,7 +10,15 @@ import {
   type MultiplayerRoomInfo,
   type OnlineSession,
 } from '../../lib/multiplayer';
-import { stepPhysics, type PhysicsBody } from '../../engine/physics2d';
+import {
+  applyMicroShake,
+  drawPhysicsHitVfx,
+  stepPhysics,
+  type ActiveImpact,
+  type PhysicsBody,
+  type PocketPulse,
+  type ScreenShake,
+} from '../../engine/physics2d';
 import {
   BASELINE_BOTTOM_Y,
   BASELINE_LEFT_X,
@@ -30,6 +38,8 @@ import {
   getCarromSide,
   getCarromTeam,
   isStrikerPositionValid,
+  raycastCarromAim,
+  STRIKER_RADIUS,
   type CarromSide,
 } from './carromEngine';
 
@@ -82,7 +92,9 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
   const pocketedThisTurnRef = useRef<PhysicsBody[]>([]);
   const dragRef = useRef<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
   const sinkingRef = useRef<Array<{ x: number; y: number; toX: number; toY: number; radius: number; color: string; start: number }>>([]);
-  const impactsRef = useRef<Array<{ x: number; y: number; intensity: number; start: number }>>([]);
+  const impactsRef = useRef<ActiveImpact[]>([]);
+  const pocketPulsesRef = useRef<PocketPulse[]>([]);
+  const shakeRef = useRef<ScreenShake | null>(null);
   const trailRef = useRef<Array<{ x: number; y: number }>>([]);
   const aiAnimRef = useRef<{
     active: boolean;
@@ -235,7 +247,11 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
 
     const viewAngle = getViewAngle();
     const half = CARROM_SIZE / 2;
+    const now = performance.now();
     ctx.save();
+    if (!applyMicroShake(ctx, now, shakeRef.current)) {
+      shakeRef.current = null;
+    }
     if (viewAngle !== 0) {
       ctx.translate(half, half);
       ctx.rotate(viewAngle);
@@ -404,7 +420,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
     }
 
     // Sinking animations
-    const now = performance.now();
     sinkingRef.current = sinkingRef.current.filter((s) => now - s.start < 240);
     for (const s of sinkingRef.current) {
       const t = (now - s.start) / 240;
@@ -421,19 +436,14 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       ctx.restore();
     }
 
-    // Impact ripple rings
-    impactsRef.current = impactsRef.current.filter((im) => now - im.start < 190);
-    for (const im of impactsRef.current) {
-      const t = (now - im.start) / 190;
-      ctx.save();
-      ctx.globalAlpha = (1 - t) * 0.45 * im.intensity;
-      ctx.strokeStyle = '#fffbeb';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.arc(im.x, im.y, 4 + t * 18 * im.intensity, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
+    // Hit VFX (warm coin/striker shockwaves, sparks, wood rail impact arcs, pocket rim pulses)
+    const vfxNext = drawPhysicsHitVfx(ctx, now, impactsRef.current, pocketPulsesRef.current, {
+      ballColor: '#fef3c7',
+      sparkColor: '#f59e0b',
+      wallColor: '#fb923c',
+    });
+    impactsRef.current = vfxNext.impacts;
+    pocketPulsesRef.current = vfxNext.pocketPulses;
 
     // Striker trail
     if (trailRef.current.length > 1) {
@@ -530,6 +540,7 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
         const clampedPull = Math.min(pull, 140);
         const ux = dx / pull;
         const uy = dy / pull;
+        const aim = raycastCarromAim(bodiesRef.current, striker, ux, uy);
 
         ctx.strokeStyle = 'rgba(220, 38, 38, 0.75)';
         ctx.lineWidth = 3;
@@ -540,13 +551,64 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
 
         ctx.save();
         ctx.setLineDash([7, 7]);
-        ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
-        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.8)';
+        ctx.lineWidth = 2.2;
         ctx.beginPath();
         ctx.moveTo(striker.x, striker.y);
-        ctx.lineTo(striker.x + ux * (110 + clampedPull * 1.4), striker.y + uy * (110 + clampedPull * 1.4));
+        ctx.lineTo(aim.hitX, aim.hitY);
         ctx.stroke();
         ctx.restore();
+
+        // Ghost striker circle at exact contact point
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(aim.hitX, aim.hitY, STRIKER_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+
+        if (aim.targetBody) {
+          const tx = aim.targetBody.x - aim.hitX;
+          const ty = aim.targetBody.y - aim.hitY;
+          const td = Math.hypot(tx, ty) || 1;
+          const nx = tx / td;
+          const ny = ty / td;
+          ctx.strokeStyle = 'rgba(217, 119, 6, 0.92)';
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.moveTo(aim.targetBody.x, aim.targetBody.y);
+          ctx.lineTo(aim.targetBody.x + nx * 60, aim.targetBody.y + ny * 60);
+          ctx.stroke();
+
+          // Striker deflection preview
+          const dot = ux * nx + uy * ny;
+          const defX = ux - dot * nx;
+          const defY = uy - dot * ny;
+          const defLen = Math.hypot(defX, defY);
+          if (defLen > 0.08) {
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(aim.hitX, aim.hitY);
+            ctx.lineTo(aim.hitX + (defX / defLen) * 40, aim.hitY + (defY / defLen) * 40);
+            ctx.stroke();
+            ctx.restore();
+          }
+        } else if (aim.wallNormalX !== undefined && aim.wallNormalY !== undefined) {
+          const dotW = ux * aim.wallNormalX + uy * aim.wallNormalY;
+          const rx = ux - 2 * dotW * aim.wallNormalX;
+          const ry = uy - 2 * dotW * aim.wallNormalY;
+          ctx.save();
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = 'rgba(180, 83, 9, 0.65)';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(aim.hitX, aim.hitY);
+          ctx.lineTo(aim.hitX + rx * 48, aim.hitY + ry * 48);
+          ctx.stroke();
+          ctx.restore();
+        }
 
         const pct = Math.round((clampedPull / 140) * 100);
         ctx.save();
@@ -715,14 +777,18 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
           friction: 0.99,
           linearFriction: 0.026,
           wallRestitution: 0.85,
-          substeps: 8,
+          substeps: 10,
           minSpeed: 0.03,
         });
 
         if (result.hitPairs.length > 0) sfx('wood');
+        if (result.maxWallImpact > 0.14) sfx('cushion');
         if (result.impactPoints.length > 0) {
           for (const im of result.impactPoints) {
-            impactsRef.current.push({ ...im, start: now });
+            impactsRef.current.push({ ...im, start: now, seed: Math.random() });
+          }
+          if (result.maxBallImpact > 0.55) {
+            shakeRef.current = { intensity: Math.min(2.8, result.maxBallImpact * 2.8), start: now };
           }
         }
         if (result.newlyPocketed.length > 0) {
@@ -736,6 +802,13 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
               radius: ev.body.radius,
               color: ev.body.color,
               start: now,
+            });
+            pocketPulsesRef.current.push({
+              x: ev.pocket.x,
+              y: ev.pocket.y,
+              radius: ev.pocket.radius,
+              start: now,
+              color: ev.body.kind === 'queen' ? '#fb7185' : '#fbbf24',
             });
           }
           sfx('pocket');
@@ -758,7 +831,14 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       const alpha = moving ? accumulator / STEP_MS : 1;
       drawBoard(alpha);
 
-      if (moving || sinkingRef.current.length > 0 || impactsRef.current.length > 0 || trailRef.current.length > 0) {
+      if (
+        moving ||
+        sinkingRef.current.length > 0 ||
+        impactsRef.current.length > 0 ||
+        pocketPulsesRef.current.length > 0 ||
+        shakeRef.current !== null ||
+        trailRef.current.length > 0
+      ) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
         rafRef.current = null;
@@ -801,6 +881,8 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       pocketedThisTurnRef.current = [];
       sinkingRef.current = [];
       impactsRef.current = [];
+      pocketPulsesRef.current = [];
+      shakeRef.current = null;
       trailRef.current = [];
       aiAnimRef.current = null;
       dragRef.current = { active: false, x: 0, y: 0 };
@@ -903,6 +985,8 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       pocketedThisTurnRef.current = [];
       sinkingRef.current = [];
       impactsRef.current = [];
+      pocketPulsesRef.current = [];
+      shakeRef.current = null;
       trailRef.current = [];
       placeStrikerForTurn(1);
       syncHud('Pertandingan baru dimulai! Giliran Pemain 1 (Putih).', null);
@@ -1095,6 +1179,16 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
         striker.prevY = striker.y;
         striker.vx = vx;
         striker.vy = vy;
+        impactsRef.current.push({
+          x: striker.x,
+          y: striker.y,
+          nx: dx / pull,
+          ny: dy / pull,
+          intensity: Math.min(0.85, (Math.min(pull, 140) / 140) * 0.85),
+          kind: 'ball',
+          start: performance.now(),
+          seed: Math.random(),
+        });
         sfx('wood');
         startSimulationLoop();
       }

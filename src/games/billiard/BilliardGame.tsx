@@ -10,7 +10,14 @@ import {
   type MultiplayerRoomInfo,
   type OnlineSession,
 } from '../../lib/multiplayer';
-import { stepPhysics } from '../../engine/physics2d';
+import {
+  applyMicroShake,
+  drawPhysicsHitVfx,
+  stepPhysics,
+  type ActiveImpact,
+  type PocketPulse,
+  type ScreenShake,
+} from '../../engine/physics2d';
 import {
   BALL_RADIUS,
   computePoolAiShot,
@@ -128,7 +135,9 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
 
   const dragRef = useRef<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
   const sinkingRef = useRef<Array<{ x: number; y: number; toX: number; toY: number; radius: number; color: string; start: number }>>([]);
-  const impactsRef = useRef<Array<{ x: number; y: number; intensity: number; start: number }>>([]);
+  const impactsRef = useRef<ActiveImpact[]>([]);
+  const pocketPulsesRef = useRef<PocketPulse[]>([]);
+  const shakeRef = useRef<ScreenShake | null>(null);
   const trailRef = useRef<Array<{ x: number; y: number }>>([]);
   const cueLungeRef = useRef<{ active: boolean; ux: number; uy: number; start: number; pull: number } | null>(null);
   const aiWindupRef = useRef<{ active: boolean; ux: number; uy: number; start: number; powerPx: number } | null>(null);
@@ -203,6 +212,11 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const now = performance.now();
+    ctx.save();
+    if (!applyMicroShake(ctx, now, shakeRef.current)) {
+      shakeRef.current = null;
+    }
 
     // Mahogany rail
     ctx.fillStyle = '#3f1d0e';
@@ -288,7 +302,6 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
     }
 
     // Sinking animations
-    const now = performance.now();
     sinkingRef.current = sinkingRef.current.filter((s) => now - s.start < 240);
     for (const s of sinkingRef.current) {
       const t = (now - s.start) / 240;
@@ -304,19 +317,14 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
       ctx.restore();
     }
 
-    // Impact ripples
-    impactsRef.current = impactsRef.current.filter((im) => now - im.start < 180);
-    for (const im of impactsRef.current) {
-      const t = (now - im.start) / 180;
-      ctx.save();
-      ctx.globalAlpha = (1 - t) * 0.45 * im.intensity;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(im.x, im.y, 4 + t * 18 * im.intensity, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
+    // Hit VFX (ball shockwaves, directional sparks, cushion compression, pocket rim pulses)
+    const vfxNext = drawPhysicsHitVfx(ctx, now, impactsRef.current, pocketPulsesRef.current, {
+      ballColor: '#ffffff',
+      sparkColor: '#fde047',
+      wallColor: '#86efac',
+    });
+    impactsRef.current = vfxNext.impacts;
+    pocketPulsesRef.current = vfxNext.pocketPulses;
 
     // Cue trail
     if (trailRef.current.length > 1) {
@@ -491,12 +499,44 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
           const tx = aim.targetBall.x - aim.hitX;
           const ty = aim.targetBall.y - aim.hitY;
           const td = Math.hypot(tx, ty) || 1;
-          ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
-          ctx.lineWidth = 2;
+          const nx = tx / td;
+          const ny = ty / td;
+          ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
+          ctx.lineWidth = 2.2;
           ctx.beginPath();
           ctx.moveTo(aim.targetBall.x, aim.targetBall.y);
-          ctx.lineTo(aim.targetBall.x + (tx / td) * 52, aim.targetBall.y + (ty / td) * 52);
+          ctx.lineTo(aim.targetBall.x + nx * 62, aim.targetBall.y + ny * 62);
           ctx.stroke();
+
+          // Cue ball deflection tangent preview
+          const dot = ux * nx + uy * ny;
+          const defX = ux - dot * nx;
+          const defY = uy - dot * ny;
+          const defLen = Math.hypot(defX, defY);
+          if (defLen > 0.08) {
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.48)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(aim.hitX, aim.hitY);
+            ctx.lineTo(aim.hitX + (defX / defLen) * 44, aim.hitY + (defY / defLen) * 44);
+            ctx.stroke();
+            ctx.restore();
+          }
+        } else if (aim.wallNormalX !== undefined && aim.wallNormalY !== undefined) {
+          const dotW = ux * aim.wallNormalX + uy * aim.wallNormalY;
+          const rx = ux - 2 * dotW * aim.wallNormalX;
+          const ry = uy - 2 * dotW * aim.wallNormalY;
+          ctx.save();
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = 'rgba(134, 239, 172, 0.6)';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(aim.hitX, aim.hitY);
+          ctx.lineTo(aim.hitX + rx * 48, aim.hitY + ry * 48);
+          ctx.stroke();
+          ctx.restore();
         }
 
         drawCueStick(cue.x, cue.y, ux, uy, 18 + clamped * 0.45);
@@ -513,6 +553,7 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
         ctx.fillText(`${pct}%`, cue.x, cue.y - 30);
       }
     }
+    ctx.restore();
   }, []);
 
   const endWithWinner = useCallback(
@@ -910,7 +951,7 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
           friction: 0.992,
           linearFriction: 0.022,
           wallRestitution: 0.84,
-          substeps: 8,
+          substeps: 10,
           minSpeed: 0.03,
         });
 
@@ -918,9 +959,13 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
           firstHitRef.current = res.firstHitId;
         }
         if (res.hitPairs.length > 0) sfx('clack');
+        if (res.maxWallImpact > 0.14) sfx('cushion');
         if (res.impactPoints.length > 0) {
           for (const im of res.impactPoints) {
-            impactsRef.current.push({ ...im, start: now });
+            impactsRef.current.push({ ...im, start: now, seed: Math.random() });
+          }
+          if (res.maxBallImpact > 0.55) {
+            shakeRef.current = { intensity: Math.min(3, res.maxBallImpact * 3), start: now };
           }
         }
         if (res.newlyPocketed.length > 0) {
@@ -934,6 +979,13 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
               radius: ev.body.radius,
               color: ev.body.color,
               start: now,
+            });
+            pocketPulsesRef.current.push({
+              x: ev.pocket.x,
+              y: ev.pocket.y,
+              radius: ev.pocket.radius,
+              start: now,
+              color: '#34d399',
             });
           }
           sfx('pocket');
@@ -956,7 +1008,15 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
       const alpha = moving ? accumulator / STEP_MS : 1;
       drawTable(alpha);
 
-      if (moving || sinkingRef.current.length > 0 || impactsRef.current.length > 0 || trailRef.current.length > 0 || cueLungeRef.current?.active) {
+      if (
+        moving ||
+        sinkingRef.current.length > 0 ||
+        impactsRef.current.length > 0 ||
+        pocketPulsesRef.current.length > 0 ||
+        shakeRef.current !== null ||
+        trailRef.current.length > 0 ||
+        cueLungeRef.current?.active
+      ) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
         rafRef.current = null;
@@ -1015,6 +1075,8 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
       pocketedTurnRef.current = [];
       sinkingRef.current = [];
       impactsRef.current = [];
+      pocketPulsesRef.current = [];
+      shakeRef.current = null;
       trailRef.current = [];
       cueLungeRef.current = null;
       aiWindupRef.current = null;
@@ -1155,6 +1217,8 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
       pocketedTurnRef.current = [];
       sinkingRef.current = [];
       impactsRef.current = [];
+      pocketPulsesRef.current = [];
+      shakeRef.current = null;
       trailRef.current = [];
       dragRef.current = { active: false, x: 0, y: 0 };
       syncHud(`Meja ${VARIANT_META[targetVar].label} dimulai! Giliran ${getPlayerLabel(1)}.`, null);
@@ -1364,7 +1428,18 @@ export const BilliardGame: React.FC<BilliardGameProps> = ({ onBack, initialRoomC
         cue.prevY = cue.y;
         cue.vx = ux * speed;
         cue.vy = uy * speed;
-        cueLungeRef.current = { active: true, ux, uy, start: performance.now(), pull: clamped };
+        const shotNow = performance.now();
+        cueLungeRef.current = { active: true, ux, uy, start: shotNow, pull: clamped };
+        impactsRef.current.push({
+          x: cue.x - ux * BALL_RADIUS,
+          y: cue.y - uy * BALL_RADIUS,
+          nx: ux,
+          ny: uy,
+          intensity: Math.min(0.85, (clamped / 150) * 0.85),
+          kind: 'ball',
+          start: shotNow,
+          seed: Math.random(),
+        });
         sfx('clack');
         startLoop();
       }

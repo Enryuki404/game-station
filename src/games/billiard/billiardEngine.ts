@@ -1,10 +1,10 @@
-import type { PhysicsBody, Pocket, TableBounds } from '../../engine/physics2d';
+import { raycastCircle, type PhysicsBody, type Pocket, type TableBounds } from '../../engine/physics2d';
 
 export const POOL_W = 880;
 export const POOL_H = 480;
 export const RAIL = 38;
 export const BALL_RADIUS = 12.5;
-export const POOL_POCKET_RADIUS = 21;
+export const POOL_POCKET_RADIUS = 22;
 
 export const POOL_BOUNDS: TableBounds = {
   left: RAIL,
@@ -14,12 +14,12 @@ export const POOL_BOUNDS: TableBounds = {
 };
 
 export const POOL_POCKETS: Pocket[] = [
-  { x: RAIL + 6, y: RAIL + 6, radius: POOL_POCKET_RADIUS },
-  { x: POOL_W / 2, y: RAIL - 2, radius: POOL_POCKET_RADIUS },
-  { x: POOL_W - RAIL - 6, y: RAIL + 6, radius: POOL_POCKET_RADIUS },
-  { x: RAIL + 6, y: POOL_H - RAIL - 6, radius: POOL_POCKET_RADIUS },
-  { x: POOL_W / 2, y: POOL_H - RAIL + 2, radius: POOL_POCKET_RADIUS },
-  { x: POOL_W - RAIL - 6, y: POOL_H - RAIL - 6, radius: POOL_POCKET_RADIUS },
+  { x: RAIL + 5, y: RAIL + 5, radius: POOL_POCKET_RADIUS },
+  { x: POOL_W / 2, y: RAIL - 2, radius: 21.5 },
+  { x: POOL_W - RAIL - 5, y: RAIL + 5, radius: POOL_POCKET_RADIUS },
+  { x: RAIL + 5, y: POOL_H - RAIL - 5, radius: POOL_POCKET_RADIUS },
+  { x: POOL_W / 2, y: POOL_H - RAIL + 2, radius: 21.5 },
+  { x: POOL_W - RAIL - 5, y: POOL_H - RAIL - 5, radius: POOL_POCKET_RADIUS },
 ];
 
 export type BilliardVariant = '8ball' | '9ball' | '15point' | 'cutthroat';
@@ -147,6 +147,10 @@ export function isCuePlacementValid(balls: PoolBall[], x: number, y: number): bo
     y > POOL_BOUNDS.bottom - BALL_RADIUS - 2
   ) {
     return false;
+  }
+
+  for (const p of POOL_POCKETS) {
+    if (Math.hypot(p.x - x, p.y - y) < p.radius + BALL_RADIUS * 0.35) return false;
   }
 
   for (const b of balls) {
@@ -296,26 +300,13 @@ export function raycastAim(
   cue: PoolBall,
   ux: number,
   uy: number
-): { hitX: number; hitY: number; targetBall?: PoolBall } {
-  const step = 3;
-  const maxDist = 900;
-  for (let d = step; d < maxDist; d += step) {
-    const px = cue.x + ux * d;
-    const py = cue.y + uy * d;
-    if (
-      px - BALL_RADIUS <= POOL_BOUNDS.left ||
-      px + BALL_RADIUS >= POOL_BOUNDS.right ||
-      py - BALL_RADIUS <= POOL_BOUNDS.top ||
-      py + BALL_RADIUS >= POOL_BOUNDS.bottom
-    ) {
-      return { hitX: px, hitY: py };
-    }
-    for (const b of balls) {
-      if (b.pocketed || b.number === 0) continue;
-      if (Math.hypot(b.x - px, b.y - py) <= BALL_RADIUS * 2) {
-        return { hitX: px, hitY: py, targetBall: b };
-      }
-    }
-  }
-  return { hitX: cue.x + ux * maxDist, hitY: cue.y + uy * maxDist };
+): { hitX: number; hitY: number; targetBall?: PoolBall; wallNormalX?: number; wallNormalY?: number } {
+  const hit = raycastCircle(balls, cue, ux, uy, POOL_BOUNDS);
+  return {
+    hitX: hit.hitX,
+    hitY: hit.hitY,
+    targetBall: hit.targetBody as PoolBall | undefined,
+    wallNormalX: hit.wallNormalX,
+    wallNormalY: hit.wallNormalY,
+  };
 }
