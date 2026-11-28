@@ -320,7 +320,7 @@ function applyUnoPlay(room: HostRoomState, actorId: string, cardId: string, chos
     actor.hand.push(...pen.drawn);
     u.drawPile = pen.nextDraw;
     u.discardPile = pen.nextDiscard;
-    penaltyMsg = ' (Lupa tekan UNO! +2 kartu)';
+    penaltyMsg = ' (Lupa tekan LAST ONE! +2 kartu)';
   }
   if (actor.hand.length === 1 && actor.isBot) {
     actor.saidUno = true;
@@ -332,7 +332,7 @@ function applyUnoPlay(room: HostRoomState, actorId: string, cardId: string, chos
   if (actor.hand.length === 0) {
     u.winnerIndex = actorIdx;
     u.lastBurst = { id: Date.now(), text: `${actor.name} MENANG!` };
-    u.statusText = `${actor.name} menang UNO!`;
+    u.statusText = `${actor.name} menang LAST ONE!`;
     return true;
   }
 
@@ -402,8 +402,8 @@ function applyUnoCall(room: HostRoomState, actorId: string): boolean {
   const player = u.players.find((p) => p.id === actorId);
   if (!player || player.hand.length > 2) return false;
   player.saidUno = true;
-  u.lastBurst = { id: Date.now(), text: `${player.name}: UNO!` };
-  u.statusText = `${player.name} berteriak "UNO!"`;
+  u.lastBurst = { id: Date.now(), text: `${player.name}: LAST ONE!` };
+  u.statusText = `${player.name} berteriak "LAST ONE!"`;
   return true;
 }
 
@@ -481,7 +481,7 @@ function handleRoomAction(
         return;
       }
       if (room.uno && room.uno.started) {
-        ack?.({ ok: false, error: 'Permainan UNO di room ini sudah dimulai.' });
+        ack?.({ ok: false, error: 'Permainan LAST ONE! di room ini sudah dimulai.' });
         return;
       }
       if (room.players.length >= room.maxPlayers) {
@@ -566,7 +566,7 @@ function handleRoomAction(
     // ---- UNO ----
     case 'uno:start': {
       if (room.gameId !== 'uno') {
-        ack?.({ ok: false, error: 'Room UNO tidak ditemukan.' });
+        ack?.({ ok: false, error: 'Room LAST ONE! tidak ditemukan.' });
         return;
       }
       if (room.hostId !== senderId) {

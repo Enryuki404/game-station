@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Dices, Globe, Loader2, LogIn, Play, Sparkles, Trophy, X } from 'lucide-react';
 import { GAMES } from '../data/games';
+import { LastOneCard, LastOneCardBack } from '../games/uno/LastOneCard';
 import { useGameStation } from '../context/GameStationContext';
 import { lookupOnlineRoom } from '../lib/multiplayer';
 import type { GameCategory, GameId } from '../types/game';
@@ -14,7 +15,6 @@ interface LobbyProps {
 const ONLINE_GAMES = new Set<GameId>(['uno', 'chess', 'carrom', 'billiard']);
 
 const PHOTO_COVERS: Partial<Record<GameId, string>> = {
-  uno: '/assets/covers/uno.jpg',
   carrom: '/assets/covers/carrom.jpg',
   billiard: '/assets/covers/billiard.jpg',
 };
@@ -37,6 +37,22 @@ const GameCoverArtwork: React.FC<{ id: GameId; title: string; subtitle: string; 
           draggable={false}
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
+      ) : id === 'uno' ? (
+        <div className="pointer-events-none absolute inset-0 felt-surface overflow-hidden group-hover:scale-105 transition-transform duration-500 ease-out">
+          <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-transparent to-rose-500/20" />
+          <div className="absolute right-40 top-6 -rotate-16 opacity-90">
+            <LastOneCardBack size="sm" />
+          </div>
+          <div className="absolute right-28 top-3 -rotate-6">
+            <LastOneCard card={{ id: 'cov-w4', color: 'wild', value: 'wild4' }} size="sm" />
+          </div>
+          <div className="absolute right-16 top-4 rotate-6">
+            <LastOneCard card={{ id: 'cov-r7', color: 'red', value: '7' }} size="sm" />
+          </div>
+          <div className="absolute right-5 top-7 rotate-16">
+            <LastOneCard card={{ id: 'cov-b2', color: 'blue', value: 'draw2' }} size="sm" />
+          </div>
+        </div>
       ) : id === 'chess' ? (
         <div
           className="absolute inset-0 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform duration-500 ease-out"
@@ -188,7 +204,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onStartOnline, onOpe
               </span>
             </h1>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-              Semua 6 game langsung terbuka untuk publik! Mabar P2P 2–6 pemain bareng teman (UNO, Catur, Karambol,
+              Semua 6 game langsung terbuka untuk publik! Mabar P2P 2–6 pemain bareng teman (LAST ONE!, Catur, Karambol,
               Billiard multi-mode) atau atur jumlah musuh AI sesukamu — semua terhubung ke dompet chip virtual.
             </p>
           </div>
@@ -358,7 +374,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onSelectGame, onStartOnline, onOpe
               </button>
             </div>
             <p className="text-xs text-slate-400">
-              Masukkan kode room (misal <span className="font-mono-num text-slate-200">GS48K2</span>) untuk langsung masuk ke meja Catur, UNO, Karambol, atau Billiard.
+              Masukkan kode room (misal <span className="font-mono-num text-slate-200">GS48K2</span>) untuk langsung masuk ke meja Catur, LAST ONE!, Karambol, atau Billiard.
             </p>
             <form onSubmit={handleLookupRoom} className="space-y-3">
               <input

@@ -197,7 +197,7 @@ io.on('connection', (socket) => {
       return;
     }
     if (room.uno && room.uno.started) {
-      ack?.({ ok: false, error: 'Permainan UNO di room ini sudah dimulai.' });
+      ack?.({ ok: false, error: 'Permainan LAST ONE! di room ini sudah dimulai.' });
       return;
     }
     if (room.players.length >= room.maxPlayers) {
@@ -272,7 +272,7 @@ io.on('connection', (socket) => {
   socket.on('uno:start', ({ code, fillBots }, ack) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'uno') {
-      ack?.({ ok: false, error: 'Room UNO tidak ditemukan.' });
+      ack?.({ ok: false, error: 'Room LAST ONE! tidak ditemukan.' });
       return;
     }
     if (room.hostId !== socket.id) {

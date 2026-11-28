@@ -22,6 +22,7 @@ import {
   type UnoColor,
   type UnoPlayer,
 } from './unoEngine';
+import { LastOneCard, LastOneCardBack, LastOneDrawDeck } from './LastOneCard';
 
 interface UnoGameProps {
   onBack: () => void;
@@ -113,7 +114,7 @@ function createInitialState(aiCount: number): UnoState {
     direction: 1,
     winnerIndex: null,
     pendingWildCard: null,
-    statusText: 'Giliran kamu! Pilih kartu yang cocok atau ambil dari dek.',
+    statusText: 'Giliran kamu! Mainkan kartu yang cocok atau klik Dek untuk mengambil.',
   };
 }
 
@@ -140,52 +141,6 @@ function drawFromPile(
 
   return { drawn, nextDraw: pool, nextDiscard: discard };
 }
-
-const UnoCardView: React.FC<{
-  card: UnoCard;
-  playable?: boolean;
-  onClick?: () => void;
-  size?: 'sm' | 'md';
-}> = ({ card, playable = false, onClick, size = 'md' }) => {
-  const label = formatUnoValue(card.value);
-  const isWild = card.color === 'wild';
-  const colorGrad =
-    card.color === 'wild'
-      ? 'from-slate-800 via-slate-900 to-slate-950 border-white/40'
-      : COLOR_STYLES[card.color].bg;
-  const textTone = card.color === 'yellow' ? 'text-slate-950' : 'text-white';
-  const dim = size === 'sm' ? 'w-14 h-20 text-base' : 'w-[54px] sm:w-20 h-[80px] sm:h-28 text-lg sm:text-2xl';
-
-  return (
-    <button
-      type="button"
-      disabled={!onClick || !playable}
-      onClick={onClick}
-      className={`${dim} animate-card-deal relative rounded-xl border-2 bg-gradient-to-br ${colorGrad} ${textTone} shadow-lg flex flex-col justify-between p-1.5 select-none transition-all duration-200 ease-out btn-tactile ${
-        playable
-          ? 'cursor-pointer hover:-translate-y-4 hover:scale-105 hover:shadow-2xl ring-2 ring-white/85'
-          : onClick
-            ? 'opacity-50 cursor-not-allowed'
-            : ''
-      }`}
-    >
-      <span className="text-[11px] font-extrabold leading-none text-left">{label}</span>
-      <div className="self-center w-10 sm:w-12 h-12 sm:h-14 rounded-full border-2 border-white/50 bg-black/20 -rotate-12 flex items-center justify-center shadow-inner">
-        {isWild ? (
-          <div className="grid grid-cols-2 w-6 h-6 rounded-full overflow-hidden rotate-12 border border-white/70">
-            <span className="bg-rose-500" />
-            <span className="bg-sky-500" />
-            <span className="bg-amber-400" />
-            <span className="bg-emerald-500" />
-          </div>
-        ) : (
-          <span className="font-black tracking-tight rotate-12">{label}</span>
-        )}
-      </div>
-      <span className="text-[11px] font-extrabold leading-none text-right rotate-180">{label}</span>
-    </button>
-  );
-};
 
 export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initialOnline }) => {
   const { addChips, recordGame, sfx } = useGameStation();
@@ -293,7 +248,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
           actor.hand.push(...pen.drawn);
           drawPile = pen.nextDraw;
           finalDiscard = pen.nextDiscard;
-          penaltyMsg = ' (Lupa tekan UNO! +2 kartu)';
+          penaltyMsg = ' (Lupa tekan LAST ONE! +2 kartu)';
         }
         if (actor.hand.length === 1 && !actor.isHuman) {
           actor.saidUno = true;
@@ -311,7 +266,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
             activeColor,
             winnerIndex: playerIdx,
             pendingWildCard: null,
-            statusText: `${actor.name} menang UNO!`,
+            statusText: `${actor.name} menang LAST ONE!`,
           };
         }
 
@@ -463,6 +418,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
     currentTurnIdx === mySeatIdx &&
     winnerIdx === null &&
     !activeWildCard;
+  const hasPlayableCard = isHumanTurn && myHand.some((c) => isCardPlayable(c, topCard, activeColor));
 
   const handleCardClick = (card: UnoCard) => {
     if (!isHumanTurn || !isCardPlayable(card, topCard, activeColor)) return;
@@ -508,10 +464,10 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
       getSocket().emit('uno:call', { code: onlineSession.code });
       return;
     }
-    triggerBurst('UNO!', 'bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950');
+    triggerBurst('LAST ONE!', 'bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950');
     setState((prev) => {
       const players = prev.players.map((p, idx) => (idx === 0 ? { ...p, saidUno: true } : p));
-      return { ...prev, players, statusText: 'Kamu berteriak "UNO!"' };
+      return { ...prev, players, statusText: 'Kamu berteriak "LAST ONE!"' };
     });
   };
 
@@ -524,8 +480,8 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
 
   return (
     <GameShell
-      title="UNO Classic"
-      subtitle="Cocokkan warna atau angka, habiskan kartumu lebih dulu!"
+      title="LAST ONE!"
+      subtitle="Cocokkan warna atau angka, jangan lupa teriak LAST ONE!"
       onBack={() => {
         leaveOnlineRoom();
         onBack();
@@ -597,8 +553,9 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
       }
       rules={[
         'Mainkan kartu yang memiliki warna, angka, atau simbol yang sama dengan kartu teratas di meja.',
+        'Klik langsung tumpukan Dek di tengah meja untuk mengambil kartu.',
         'Mode Online P2P (2–6 Pemain): Setiap pemain hanya melihat kartu tangannya sendiri di bawah, sedangkan kartu lawan tertutup (anti-intip).',
-        'Saat tersisa 2 kartu sebelum giliranmu berakhir ke 1 kartu, tekan tombol "UNO!" dulu agar tidak kena penalti +2 kartu!',
+        'Saat tersisa 2 kartu sebelum giliranmu berakhir ke 1 kartu, tekan tombol "LAST ONE!" agar tidak kena penalti +2 kartu!',
         'Menang memberi hadiah +500 Chip.',
       ]}
     >
@@ -607,7 +564,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
         <div className="max-w-lg mx-auto rounded-3xl border border-slate-800 bg-slate-900/80 p-6 space-y-5 text-center shadow-2xl">
           {!onlineSession ? (
             <div className="space-y-4">
-              <h2 className="text-xl font-extrabold text-white">Mabar UNO Online (2–6 Pemain)</h2>
+              <h2 className="text-xl font-extrabold text-white">Mabar LAST ONE! Online (2–6 Pemain)</h2>
               <p className="text-sm text-slate-300">
                 Buat room untuk mendapatkan kode &amp; link invite, atau gabung ke room temanmu.
               </p>
@@ -622,7 +579,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
           ) : (
             <div className="space-y-4">
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Kode Room UNO</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Kode Room LAST ONE!</span>
                 <p className="text-3xl font-black font-mono-num tracking-widest text-white mt-1">
                   {onlineSession.code}
                 </p>
@@ -720,12 +677,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                   </div>
                   <div className="flex -space-x-2.5 sm:-space-x-3 shrink-0">
                     {Array.from({ length: Math.min(opp.cardCount, 4) }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-5 h-7 sm:w-7 sm:h-10 rounded sm:rounded-md border border-rose-400/40 bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-[8px] sm:text-[9px] font-black text-rose-400 shadow"
-                      >
-                        U
-                      </div>
+                      <LastOneCardBack key={i} size="mini" />
                     ))}
                   </div>
                 </div>
@@ -746,22 +698,17 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
             </div>
 
             <div className="relative flex items-center justify-center gap-6 sm:gap-10 py-2">
-              <button
-                type="button"
-                disabled={!isHumanTurn}
-                onClick={handleDrawClick}
-                className={`group relative w-20 h-28 rounded-xl border-2 border-slate-300/40 bg-gradient-to-br from-slate-800 via-slate-900 to-black shadow-xl flex flex-col items-center justify-center transition btn-tactile ${
-                  isHumanTurn ? 'cursor-pointer hover:-translate-y-1 hover:border-amber-300' : 'opacity-65 cursor-not-allowed'
-                }`}
-              >
-                <span className="text-lg font-black text-rose-500 tracking-wider -rotate-12">UNO</span>
-                <span className="text-[10px] text-slate-300 mt-1">Ambil ({drawCount})</span>
-              </button>
+              <LastOneDrawDeck
+                drawCount={drawCount}
+                canDraw={isHumanTurn}
+                hasPlayableCard={hasPlayableCard}
+                onDraw={handleDrawClick}
+              />
 
               <div className="relative">
                 <div className={`absolute -inset-2 rounded-2xl blur-md opacity-45 transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
                 <div key={topCard.id} className="relative animate-card-throw">
-                  <UnoCardView card={topCard} size="md" />
+                  <LastOneCard card={topCard} size="md" />
                 </div>
                 <div className={`absolute -bottom-2 -right-2 w-5 h-5 rounded-full border-2 border-white shadow-md transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
               </div>
@@ -793,7 +740,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                 </h2>
                 {myPlayerMeta?.saidUno && (
                   <span className="px-2 py-0.5 text-[11px] font-extrabold rounded-full bg-amber-400 text-slate-950">
-                    UNO AKTIF
+                    LAST ONE AKTIF
                   </span>
                 )}
               </div>
@@ -806,16 +753,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                     className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-rose-500 px-4 py-1.5 text-xs sm:text-sm font-extrabold text-slate-950 shadow-lg animate-pulse-glow cursor-pointer"
                   >
                     <BellRing className="w-4 h-4" />
-                    TERIAK UNO!
-                  </button>
-                )}
-                {isHumanTurn && (
-                  <button
-                    type="button"
-                    onClick={handleDrawClick}
-                    className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 cursor-pointer"
-                  >
-                    Ambil Kartu
+                    TERIAK LAST ONE!
                   </button>
                 )}
               </div>
@@ -825,7 +763,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               {myHand.map((card) => {
                 const playable = isHumanTurn && isCardPlayable(card, topCard, activeColor);
                 return (
-                  <UnoCardView
+                  <LastOneCard
                     key={card.id}
                     card={card}
                     playable={playable}
@@ -892,7 +830,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
       <OnlineRoomModal
         open={roomModalOpen}
         gameId="uno"
-        gameTitle="UNO Classic"
+        gameTitle="LAST ONE!"
         initialJoinCode={initialRoomCode}
         activeSession={onlineSession}
         onConnected={(session) => {

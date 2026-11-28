@@ -3,12 +3,12 @@ import type { GameMeta } from '../types/game';
 export const GAMES: GameMeta[] = [
   {
     id: 'uno',
-    title: 'UNO Classic',
-    subtitle: 'Kartu Pesta & Strategi',
+    title: 'LAST ONE!',
+    subtitle: 'Pesta Kartu 2–6 Pemain',
     category: 'card',
     modes: ['Online 2–6P', 'vs 1–5 AI'],
     description:
-      'Cocokkan warna atau angka, lempar +2/+4 dan Skip, serta jangan lupa teriak UNO saat kartu tersisa satu!',
+      'Cocokkan warna atau angka, lempar +2/+4 dan Skip, lalu teriak LAST ONE! saat kartu tersisa satu.',
     accentFrom: 'from-rose-500',
     accentTo: 'to-amber-500',
     badgeColor: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
