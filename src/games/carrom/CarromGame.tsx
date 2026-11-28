@@ -59,15 +59,25 @@ interface CarromHud {
   score2: number;
   status: string;
   winner: 1 | 2 | null;
-  strikerT: number;
   isMoving: boolean;
 }
 
-function strikerToT(striker: PhysicsBody | undefined, side: CarromSide): number {
-  if (!striker) return 0.5;
+function getBaselineMetrics(pt: { x: number; y: number }, side: CarromSide) {
+  const isVertical = side === 'left' || side === 'right';
+  const baseCoord =
+    side === 'bottom'
+      ? BASELINE_BOTTOM_Y
+      : side === 'top'
+        ? BASELINE_TOP_Y
+        : side === 'left'
+          ? BASELINE_LEFT_X
+          : BASELINE_RIGHT_X;
+  const perpDist = Math.abs((isVertical ? pt.x : pt.y) - baseCoord);
+  const alongCoord = isVertical ? pt.y : pt.x;
   const span = BASELINE_MAX_X - BASELINE_MIN_X;
-  const coord = side === 'left' || side === 'right' ? striker.y : striker.x;
-  return Math.max(0, Math.min(1, (coord - BASELINE_MIN_X) / span));
+  const t = Math.max(0, Math.min(1, (alongCoord - BASELINE_MIN_X) / span));
+  const withinSpan = alongCoord >= BASELINE_MIN_X - 24 && alongCoord <= BASELINE_MAX_X + 24;
+  return { perpDist, alongCoord, t, withinSpan };
 }
 
 export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode, initialOnline }) => {
@@ -90,7 +100,16 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
   const movingRef = useRef(false);
   const queenStateRef = useRef<'board' | 'pending_1' | 'pending_2' | 'claimed_1' | 'claimed_2'>('board');
   const pocketedThisTurnRef = useRef<PhysicsBody[]>([]);
-  const dragRef = useRef<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
+  const dragRef = useRef<{
+    mode: 'none' | 'pending' | 'slide' | 'aim';
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+  }>({ mode: 'none', startX: 0, startY: 0, x: 0, y: 0 });
+  const lastStrikerEmitRef = useRef(0);
+  const winnerRef = useRef<1 | 2 | null>(null);
+  const [canvasCursor, setCanvasCursor] = useState<'crosshair' | 'grab' | 'grabbing'>('crosshair');
   const sinkingRef = useRef<Array<{ x: number; y: number; toX: number; toY: number; radius: number; color: string; start: number }>>([]);
   const impactsRef = useRef<ActiveImpact[]>([]);
   const pocketPulsesRef = useRef<PocketPulse[]>([]);
@@ -144,9 +163,8 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
     queenState: 'board',
     score1: 0,
     score2: 0,
-    status: 'Geser striker lalu tarik ke belakang untuk menembak!',
+    status: 'Geser bidak kuning di garis hijau, lalu tarik mundur untuk menembak!',
     winner: null,
-    strikerT: 0.5,
     isMoving: false,
   });
 
@@ -154,9 +172,10 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
     const bodies = bodiesRef.current;
     const whiteLeft = bodies.filter((b) => b.kind === 'white' && !b.pocketed).length;
     const blackLeft = bodies.filter((b) => b.kind === 'black' && !b.pocketed).length;
-    const striker = bodies.find((b) => b.kind === 'striker');
     const qState = queenStateRef.current;
-    const side = getCarromSide(turnRef.current, playerCountRef.current);
+    if (winnerOverride !== undefined) {
+      winnerRef.current = winnerOverride;
+    }
 
     const score1 = 9 - whiteLeft + (qState === 'claimed_1' ? 3 : 0);
     const score2 = 9 - blackLeft + (qState === 'claimed_2' ? 3 : 0);
@@ -171,7 +190,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       score2,
       status: statusOverride ?? prev.status,
       winner: winnerOverride !== undefined ? winnerOverride : prev.winner,
-      strikerT: strikerToT(striker, side),
       isMoving: movingRef.current,
     }));
   }, []);
@@ -502,8 +520,56 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       ctx.restore();
     }
 
-    // Aim guides
+    // Slide affordance + Aim guides
     const striker = bodiesRef.current.find((b) => b.kind === 'striker');
+    const canLocalDrag =
+      !movingRef.current &&
+      !aiAnimRef.current?.active &&
+      winnerRef.current === null &&
+      ((modeRef.current === 'ai' && turnRef.current === 1) ||
+        (modeRef.current === 'online' &&
+          Boolean(onlineSessionRef.current && onlineSessionRef.current.room.players.length >= 2) &&
+          turnRef.current === (onlineSessionRef.current?.seatIdx ?? 0) + 1));
+
+    if (canLocalDrag && striker && !striker.pocketed && dragRef.current.mode !== 'aim') {
+      const side = getCarromSide(turnRef.current, playerCountRef.current);
+      const isVertical = side === 'left' || side === 'right';
+      const isSliding = dragRef.current.mode === 'slide' || dragRef.current.mode === 'pending';
+
+      ctx.save();
+      if (isSliding) {
+        ctx.beginPath();
+        ctx.arc(striker.x, striker.y, STRIKER_RADIUS + 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
+        ctx.stroke();
+      }
+
+      // Flanking chevron arrows along baseline axis to show direct slide control
+      ctx.translate(striker.x, striker.y);
+      if (isVertical) ctx.rotate(Math.PI / 2);
+      const offset = STRIKER_RADIUS + 10;
+      const drawChevron = (dir: -1 | 1) => {
+        ctx.beginPath();
+        ctx.moveTo(dir * (offset - 4), -4.5);
+        ctx.lineTo(dir * (offset + 2), 0);
+        ctx.lineTo(dir * (offset - 4), 4.5);
+        ctx.lineWidth = 3.2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.65)';
+        ctx.stroke();
+        ctx.lineWidth = 1.9;
+        ctx.strokeStyle = isSliding ? '#34d399' : '#fef08a';
+        ctx.stroke();
+      };
+      drawChevron(-1);
+      drawChevron(1);
+      ctx.restore();
+    }
+
     if (aiAnimRef.current?.active && striker && !striker.pocketed) {
       const anim = aiAnimRef.current;
       const elapsed = now - anim.start;
@@ -532,7 +598,7 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
         ctx.stroke();
         ctx.restore();
       }
-    } else if (dragRef.current.active && striker && !striker.pocketed && !movingRef.current) {
+    } else if (dragRef.current.mode === 'aim' && striker && !striker.pocketed && !movingRef.current) {
       const dx = striker.x - dragRef.current.x;
       const dy = striker.y - dragRef.current.y;
       const pull = Math.hypot(dx, dy);
@@ -874,6 +940,7 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       playerCountRef.current = targetCount;
 
       rewardRef.current = false;
+      winnerRef.current = null;
       bodiesRef.current = createCarromBodies();
       turnRef.current = 1;
       movingRef.current = false;
@@ -885,12 +952,12 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       shakeRef.current = null;
       trailRef.current = [];
       aiAnimRef.current = null;
-      dragRef.current = { active: false, x: 0, y: 0 };
+      dragRef.current = { mode: 'none', startX: 0, startY: 0, x: 0, y: 0 };
       placeStrikerForTurn(1);
       syncHud(
         targetCount === 4
           ? 'Mode 4P (2v2) siap! Giliran Pemain 1 (Putih).'
-          : 'Geser striker lalu tarik ke belakang untuk menembak!',
+          : 'Geser bidak kuning di garis hijau, lalu tarik mundur untuk menembak!',
         null
       );
       drawBoard();
@@ -975,6 +1042,7 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
 
     const onRematch = (payload?: { playerCount?: 2 | 4 }) => {
       rewardRef.current = false;
+      winnerRef.current = null;
       if (payload?.playerCount) {
         playerCountRef.current = payload.playerCount;
       }
@@ -988,6 +1056,7 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       pocketPulsesRef.current = [];
       shakeRef.current = null;
       trailRef.current = [];
+      dragRef.current = { mode: 'none', startX: 0, startY: 0, x: 0, y: 0 };
       placeStrikerForTurn(1);
       syncHud('Pertandingan baru dimulai! Giliran Pemain 1 (Putih).', null);
       drawBoard();
@@ -1125,27 +1194,117 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
         Boolean(onlineSession && onlineSession.room.players.length >= 2) &&
         hud.turn === (onlineSession?.seatIdx ?? 0) + 1));
 
+  const moveStrikerToT = (nextT: number, forceEmit = false) => {
+    const striker = bodiesRef.current.find((b) => b.kind === 'striker');
+    if (!striker || striker.pocketed) return;
+    const side = getCarromSide(turnRef.current, playerCountRef.current);
+    const pt = getBaselinePoint(side, nextT);
+    if (isStrikerPositionValid(bodiesRef.current, pt.x, pt.y)) {
+      striker.x = pt.x;
+      striker.y = pt.y;
+    } else {
+      const valid = findValidStrikerOnSide(bodiesRef.current, side, nextT);
+      striker.x = valid.x;
+      striker.y = valid.y;
+    }
+    striker.prevX = striker.x;
+    striker.prevY = striker.y;
+    if (modeRef.current === 'online' && onlineSessionRef.current) {
+      const now = performance.now();
+      if (forceEmit || now - lastStrikerEmitRef.current >= 45) {
+        lastStrikerEmitRef.current = now;
+        getSocket().emit('carrom:striker', {
+          code: onlineSessionRef.current.code,
+          x: striker.x,
+          y: striker.y,
+        });
+      }
+    }
+    drawBoard();
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!canHumanInteract) return;
     const pt = getCanvasPoint(e);
     const striker = bodiesRef.current.find((b) => b.kind === 'striker');
-    if (!striker) return;
+    if (!striker || striker.pocketed) return;
+
+    const side = getCarromSide(turnRef.current, playerCountRef.current);
+    const bm = getBaselineMetrics(pt, side);
+    const distToStriker = Math.hypot(pt.x - striker.x, pt.y - striker.y);
+
     e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { active: true, x: pt.x, y: pt.y };
+    if (distToStriker <= STRIKER_RADIUS + 14) {
+      dragRef.current = { mode: 'pending', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
+      setCanvasCursor('grabbing');
+    } else if (bm.perpDist <= 26 && bm.withinSpan) {
+      dragRef.current = { mode: 'slide', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
+      setCanvasCursor('grabbing');
+      moveStrikerToT(bm.t, true);
+      return;
+    } else {
+      dragRef.current = { mode: 'aim', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
+      setCanvasCursor('crosshair');
+    }
     drawBoard();
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!dragRef.current.active) return;
     const pt = getCanvasPoint(e);
+    const side = getCarromSide(turnRef.current, playerCountRef.current);
+
+    if (dragRef.current.mode === 'none') {
+      if (!canHumanInteract) {
+        if (canvasCursor !== 'crosshair') setCanvasCursor('crosshair');
+        return;
+      }
+      const striker = bodiesRef.current.find((b) => b.kind === 'striker');
+      const bm = getBaselineMetrics(pt, side);
+      const nearStriker = Boolean(striker && !striker.pocketed && Math.hypot(pt.x - striker.x, pt.y - striker.y) <= STRIKER_RADIUS + 14);
+      const nearBaseline = bm.perpDist <= 22 && bm.withinSpan;
+      const nextCursor = nearStriker || nearBaseline ? 'grab' : 'crosshair';
+      if (canvasCursor !== nextCursor) setCanvasCursor(nextCursor);
+      return;
+    }
+
     dragRef.current.x = pt.x;
     dragRef.current.y = pt.y;
+
+    if (dragRef.current.mode === 'pending') {
+      const dx = Math.abs(pt.x - dragRef.current.startX);
+      const dy = Math.abs(pt.y - dragRef.current.startY);
+      const isVertical = side === 'left' || side === 'right';
+      const alongDelta = isVertical ? dy : dx;
+      const perpDelta = isVertical ? dx : dy;
+      if (Math.hypot(dx, dy) >= 7) {
+        const bm = getBaselineMetrics(pt, side);
+        if (alongDelta >= perpDelta * 1.15 && bm.perpDist <= 36) {
+          dragRef.current.mode = 'slide';
+          moveStrikerToT(bm.t);
+        } else {
+          dragRef.current.mode = 'aim';
+          setCanvasCursor('crosshair');
+          drawBoard();
+        }
+      }
+      return;
+    }
+
+    if (dragRef.current.mode === 'slide') {
+      moveStrikerToT(getBaselineMetrics(pt, side).t);
+      return;
+    }
+
     drawBoard();
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!dragRef.current.active) return;
-    dragRef.current.active = false;
+    if (dragRef.current.mode === 'none') return;
+    const prevMode = dragRef.current.mode;
+    const endX = dragRef.current.x;
+    const endY = dragRef.current.y;
+    dragRef.current = { mode: 'none', startX: 0, startY: 0, x: 0, y: 0 };
+    setCanvasCursor('crosshair');
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
@@ -1158,8 +1317,25 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       return;
     }
 
-    const dx = striker.x - dragRef.current.x;
-    const dy = striker.y - dragRef.current.y;
+    if (prevMode === 'slide') {
+      if (modeRef.current === 'online' && onlineSessionRef.current) {
+        getSocket().emit('carrom:striker', {
+          code: onlineSessionRef.current.code,
+          x: striker.x,
+          y: striker.y,
+        });
+      }
+      drawBoard();
+      return;
+    }
+
+    if (prevMode === 'pending') {
+      drawBoard();
+      return;
+    }
+
+    const dx = striker.x - endX;
+    const dy = striker.y - endY;
     const pull = Math.hypot(dx, dy);
 
     if (pull > 14) {
@@ -1196,38 +1372,6 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       drawBoard();
     }
   };
-
-  const handleSliderChange = (nextT: number) => {
-    if (!canHumanInteract) return;
-    const striker = bodiesRef.current.find((b) => b.kind === 'striker');
-    if (!striker) return;
-    const side = getCarromSide(hud.turn, hud.playerCount);
-    const pt = getBaselinePoint(side, nextT);
-    if (isStrikerPositionValid(bodiesRef.current, pt.x, pt.y)) {
-      striker.x = pt.x;
-      striker.y = pt.y;
-    } else {
-      const valid = findValidStrikerOnSide(bodiesRef.current, side, nextT);
-      striker.x = valid.x;
-      striker.y = valid.y;
-    }
-    striker.prevX = striker.x;
-    striker.prevY = striker.y;
-    if (modeRef.current === 'online' && onlineSessionRef.current) {
-      getSocket().emit('carrom:striker', {
-        code: onlineSessionRef.current.code,
-        x: striker.x,
-        y: striker.y,
-      });
-    }
-    syncHud();
-    drawBoard();
-  };
-
-  const currentSide = getCarromSide(hud.turn, hud.playerCount);
-  const viewAngle = getViewAngle();
-  const isSliderInverted =
-    mode === 'online' && (viewAngle === Math.PI || (viewAngle === Math.PI / 2 && currentSide === 'right'));
 
   return (
     <GameShell
@@ -1305,13 +1449,13 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       rules={[
         'Papan Karambol tetap statis (tidak berputar setiap giliran). Pada mode 4 Pemain (2v2): P1 (Bawah) & P3 (Atas) = Tim Putih, sedangkan P2 (Kanan) & P4 (Kiri) = Tim Hitam.',
         'Garis yang menyala hijau menunjukkan sisi pemain yang sedang mendapat giliran menembak.',
-        'Gunakan slider di bawah papan untuk menggeser Striker, lalu klik & tarik mundur di papan seperti ketapel!',
+        'Geser bidak kuning (Striker) langsung di sepanjang garis hijau (atau tap garis hijau) untuk atur posisi, lalu tarik mundur di papan seperti ketapel untuk menembak!',
         'Memasukkan koin tim memberi giliran lanjut. Ratu Merah (+3 poin) harus di-cover dengan memasukkan koin tim.',
         'Menang vs AI atau Online memberikan +500 Chip.',
       ]}
     >
       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,480px)_minmax(240px,300px)] lg:grid-cols-[minmax(0,560px)_300px] gap-4 lg:gap-6 items-start justify-center">
-        <div className="mx-auto w-full max-w-[560px] md:max-w-[min(100%,560px,calc(100dvh-225px))] space-y-2.5 sm:space-y-3">
+        <div className="mx-auto w-full max-w-[560px] md:max-w-[min(100%,560px,calc(100dvh-205px))] space-y-2.5 sm:space-y-3">
           <div className="rounded-2xl overflow-hidden border-2 border-amber-900/60 shadow-2xl bg-amber-950/40">
             <canvas
               ref={canvasRef}
@@ -1319,27 +1463,23 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
-              className="w-full aspect-square block touch-none cursor-crosshair"
+              onPointerLeave={() => {
+                if (dragRef.current.mode === 'none') setCanvasCursor('crosshair');
+              }}
+              className={`w-full aspect-square block touch-none ${
+                canvasCursor === 'grabbing'
+                  ? 'cursor-grabbing'
+                  : canvasCursor === 'grab'
+                    ? 'cursor-grab'
+                    : 'cursor-crosshair'
+              }`}
             />
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 flex items-center gap-4">
-            <span className="text-xs font-semibold text-slate-300 whitespace-nowrap">Posisi Striker</span>
-            <input
-              type="range"
-              aria-label="Posisi Striker"
-              min={0}
-              max={100}
-              step={1}
-              disabled={!canHumanInteract}
-              value={Math.round((isSliderInverted ? 1 - hud.strikerT : hud.strikerT) * 100)}
-              onChange={(e) => {
-                const rawT = Number(e.target.value) / 100;
-                handleSliderChange(isSliderInverted ? 1 - rawT : rawT);
-              }}
-              className="w-full accent-amber-400 cursor-pointer disabled:opacity-40"
-            />
-          </div>
+          <p className="rounded-xl border border-slate-800/80 bg-slate-900/70 px-3.5 py-2 text-center text-xs text-slate-300">
+            <span className="font-semibold text-amber-300">Geser bidak kuning</span> di garis hijau untuk atur posisi •{' '}
+            <span className="font-semibold text-emerald-300">Tarik mundur</span> untuk menembak
+          </p>
         </div>
 
         {/* Scoreboard & Status */}
