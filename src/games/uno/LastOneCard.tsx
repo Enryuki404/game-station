@@ -29,7 +29,7 @@ function cornerLabel(val: UnoValue): string {
     case 'skip':
       return '⊘';
     case 'skipAll':
-      return '⊘⊘';
+      return '↻';
     case 'reverse':
       return '⇄';
     case 'discardAll':
@@ -49,6 +49,19 @@ function cornerLabel(val: UnoValue): string {
   }
 }
 
+const SkipAllIcon: React.FC<{ className?: string }> = ({ className = 'w-7 h-7 sm:w-9 sm:h-9' }) => (
+  <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+    <path
+      d="M 36.2 18.3 A 13.5 13.5 0 1 1 22.8 10.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="4.8"
+      strokeLinecap="round"
+    />
+    <path d="M 22.2 4.5 L 32.5 11.4 L 21.4 16.5 Z" fill="currentColor" />
+  </svg>
+);
+
 const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
   const isYellow = card.color === 'yellow';
   const strokeMain = isYellow ? '#0f172a' : '#ffffff';
@@ -64,11 +77,9 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
 
   if (card.value === 'skipAll') {
     return (
-      <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
-        <circle cx="20" cy="26" r="11" fill="none" stroke={strokeMain} strokeWidth="3.5" opacity="0.65" />
-        <circle cx="27" cy="21" r="12" fill="none" stroke={strokeMain} strokeWidth="4" />
-        <line x1="18" y1="30" x2="36" y2="12" stroke={strokeMain} strokeWidth="4" strokeLinecap="round" />
-      </svg>
+      <SkipAllIcon
+        className={`w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md ${isYellow ? 'text-slate-950' : 'text-white'}`}
+      />
     );
   }
 
@@ -260,7 +271,11 @@ export const LastOneCard: React.FC<{
 
       {/* Top-left index */}
       <span className={`relative z-10 self-start inline-flex flex-col items-center w-fit ${cornerCls} font-black leading-none tracking-tight`}>
-        <span>{corner}</span>
+        {card.value === 'skipAll' ? (
+          <SkipAllIcon className={size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3 sm:w-3.5 sm:h-3.5'} />
+        ) : (
+          <span>{corner}</span>
+        )}
         {needsUnderline && <span className="w-2 h-[1.5px] bg-current mt-[1px]" />}
       </span>
 
@@ -273,7 +288,11 @@ export const LastOneCard: React.FC<{
 
       {/* Bottom-right inverted index */}
       <span className={`relative z-10 self-end inline-flex flex-col items-center w-fit rotate-180 ${cornerCls} font-black leading-none tracking-tight`}>
-        <span>{corner}</span>
+        {card.value === 'skipAll' ? (
+          <SkipAllIcon className={size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3 sm:w-3.5 sm:h-3.5'} />
+        ) : (
+          <span>{corner}</span>
+        )}
         {needsUnderline && <span className="w-2 h-[1.5px] bg-current mt-[1px]" />}
       </span>
     </>
