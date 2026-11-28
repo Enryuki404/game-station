@@ -23,7 +23,9 @@ export type UnoValue =
   | 'skipAll'
   | 'discardAll'
   | 'hit2'
-  | 'wildAllHit';
+  | 'wildAllHit'
+  | 'wildRoulette'
+  | 'wildRev4';
 
 export type UnoVariant = 'classic' | 'stack' | 'sevenzero' | 'nomercy' | 'allwild' | 'attack';
 
@@ -53,6 +55,13 @@ export interface SharedUnoMatchPlayer {
   eliminated: boolean;
 }
 
+export interface PendingRoulette {
+  victimIdx: number;
+  victimId: string;
+  victimName: string;
+  playedBy: string;
+}
+
 export interface SharedUnoMatch {
   variant: UnoVariant;
   started: boolean;
@@ -64,6 +73,7 @@ export interface SharedUnoMatch {
   direction: 1 | -1;
   pendingDraw: number;
   pendingDrawMin: number;
+  pendingRoulette?: PendingRoulette | null;
   winnerIndex: number | null;
   lastBurst: { id: number; text: string } | null;
   lastLauncherEvent?: { id: number; cards: number; actorName: string } | null;
@@ -111,10 +121,11 @@ export const UNO_VARIANT_META: Record<UnoVariant, { label: string; shortDesc: st
   },
   nomercy: {
     label: 'No Mercy',
-    shortDesc: 'Brutal! Ada +6, +10, Skip All, Discard All, 7-0, Draw Until Playable & Mercy KO (25+ kartu gugur!).',
+    shortDesc: 'Brutal! Ada Color Roulette, Reverse +4, +6/+10, Skip All, Discard All, 7-0 & Mercy KO (25+ kartu gugur!).',
     rules: [
       'Aturan Mercy (KO): Siapa pun yang memegang 25 kartu atau lebih langsung GUGUR (KO) dari meja!',
-      'Hardcore Stacking: +2, +4, +6 Wild, dan +10 Wild bisa di-stack dengan kartu draw bernilai sama atau lebih besar.',
+      'Wild Color Roulette: Pemain berikutnya wajib memilih 1 warna lalu menarik kartu terus sampai mendapat warna pilihannya!',
+      'Hardcore Stacking: +2, Reverse +4, +4, +6 Wild, dan +10 Wild bisa di-stack dengan kartu draw bernilai sama atau lebih besar.',
       'Skip All melewati semua lawan sehingga giliran langsung kembali ke kamu! Discard All membuang seluruh kartu warna sama sekaligus!',
       'Kartu 7 tukar tangan, Kartu 0 putar tangan, dan klik Dek akan menarik kartu terus sampai mendapat kartu yang bisa dimainkan.',
     ],
@@ -185,7 +196,7 @@ function triggerLauncherPress(match: SharedUnoMatch): number {
 
 export function getDrawPower(value: UnoValue): number {
   if (value === 'draw2') return 2;
-  if (value === 'wild4') return 4;
+  if (value === 'wild4' || value === 'wildRev4') return 4;
   if (value === 'wild6') return 6;
   if (value === 'wild10') return 10;
   return 0;
@@ -256,6 +267,8 @@ export function createUnoDeck(variant: UnoVariant = 'classic'): UnoCard[] {
   if (variant === 'nomercy') {
     for (let i = 0; i < 4; i++) {
       deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild6' });
+      deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wildRoulette' });
+      deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wildRev4' });
     }
     for (let i = 0; i < 2; i++) {
       deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild10' });
@@ -286,6 +299,16 @@ export function isCardPlayable(
   return false;
 }
 
+export function chooseBestAiColor(hand: UnoCard[]): UnoColor {
+  const counts: Record<UnoColor, number> = { red: 0, blue: 0, green: 0, yellow: 0 };
+  for (const c of hand) {
+    if (c.color !== 'wild') {
+      counts[c.color]++;
+    }
+  }
+  return (Object.entries(counts) as Array<[UnoColor, number]>).sort((a, b) => b[1] - a[1])[0][0];
+}
+
 export function chooseBestAiCard(
   hand: UnoCard[],
   topCard: UnoCard,
@@ -302,10 +325,12 @@ export function chooseBestAiCard(
   const score = (c: UnoCard): number => {
     if (c.value === 'wildAllHit') return 58;
     if (c.value === 'discardAll') return 55;
+    if (c.value === 'wildRoulette') return 50;
     if (c.value === 'skipAll') return 48;
     if (c.value === 'hit2') return 44;
     if (c.value === 'wild10') return pendingDraw > 0 ? 60 : 42;
     if (c.value === 'wild6') return pendingDraw > 0 ? 52 : 38;
+    if (c.value === 'wildRev4') return pendingDraw > 0 ? 50 : 36;
     if (c.value === 'draw2') return 40;
     if (c.value === 'skip' || c.value === 'reverse') return 35;
     if (c.color !== 'wild') return 20 + (Number.isNaN(Number(c.value)) ? 0 : Number(c.value));
@@ -316,15 +341,7 @@ export function chooseBestAiCard(
   playable.sort((a, b) => score(b) - score(a));
   const chosen = playable[0];
 
-  const counts: Record<UnoColor, number> = { red: 0, blue: 0, green: 0, yellow: 0 };
-  for (const c of hand) {
-    if (c.id !== chosen.id && c.color !== 'wild') {
-      counts[c.color]++;
-    }
-  }
-  const bestColor = (Object.entries(counts) as Array<[UnoColor, number]>).sort((a, b) => b[1] - a[1])[0][0];
-
-  return { card: chosen, chosenColor: bestColor };
+  return { card: chosen, chosenColor: chooseBestAiColor(hand.filter((c) => c.id !== chosen.id)) };
 }
 
 export function formatUnoValue(value: UnoValue): string {
@@ -345,6 +362,10 @@ export function formatUnoValue(value: UnoValue): string {
       return 'Wild';
     case 'wildAllHit':
       return 'Wild All Hit';
+    case 'wildRoulette':
+      return 'Color Roulette';
+    case 'wildRev4':
+      return 'Reverse +4';
     case 'wild4':
       return '+4 Wild';
     case 'wild6':
@@ -468,6 +489,7 @@ export function createSharedUnoMatch(
     direction: 1,
     pendingDraw: 0,
     pendingDrawMin: 0,
+    pendingRoulette: null,
     winnerIndex: null,
     lastBurst: null,
     lastLauncherEvent: null,
@@ -484,7 +506,7 @@ export function applySharedUnoPlay(
   chosenColor?: UnoColor,
   swapTargetId?: string
 ): boolean {
-  if (!match.started || match.winnerIndex !== null) return false;
+  if (!match.started || match.winnerIndex !== null || match.pendingRoulette) return false;
   const actorIdx = match.currentTurn;
   const actor = match.players[actorIdx];
   if (!actor || actor.id !== actorId || actor.eliminated) return false;
@@ -522,7 +544,9 @@ export function applySharedUnoPlay(
       : chosenColor && UNO_COLORS.includes(chosenColor)
         ? chosenColor
         : 'red';
-  match.activeColor = card.color === 'wild' ? validColor : card.color;
+  if (card.value !== 'wildRoulette') {
+    match.activeColor = card.color === 'wild' ? validColor : card.color;
+  }
 
   let penaltyMsg = '';
   if (actor.hand.length === 1 && !actor.isBot && !actor.saidUno) {
@@ -546,6 +570,24 @@ export function applySharedUnoPlay(
     match.pendingDrawMin = 0;
     match.lastBurst = { id: Date.now(), text: `${actor.name} MENANG!` };
     match.statusText = `${actor.name} menang LAST ONE!`;
+    return true;
+  }
+
+  // Wild Color Roulette: pause turn so next alive victim chooses a color & draws until pulling that color
+  if (card.value === 'wildRoulette') {
+    const mercyActorEarly = checkMercyElimination(match, actorIdx);
+    if (mercyActorEarly === 'WIN') return true;
+    const victimIdx = nextAliveIndex(match.players, actorIdx, match.direction, 1);
+    const victim = match.players[victimIdx];
+    match.pendingRoulette = {
+      victimIdx,
+      victimId: victim.id,
+      victimName: victim.name,
+      playedBy: actor.name,
+    };
+    match.currentTurn = victimIdx;
+    match.lastBurst = { id: Date.now(), text: 'COLOR ROULETTE!' };
+    match.statusText = `${actor.name} mainkan Color Roulette!${penaltyMsg}${mercyActorEarly} ${victim.name} harus memilih warna!`;
     return true;
   }
 
@@ -605,6 +647,15 @@ export function applySharedUnoPlay(
     step = 2;
     effectNote = ` — ${skipped.name} dilewati!`;
     match.lastBurst = { id: Date.now(), text: 'SKIP!' };
+  } else if (card.value === 'wildRev4') {
+    if (aliveCount > 2) {
+      match.direction = (match.direction * -1) as 1 | -1;
+    }
+    match.pendingDraw += 4;
+    match.pendingDrawMin = Math.max(match.pendingDrawMin, 4);
+    step = 1;
+    effectNote = ` — Reverse & Stack +${match.pendingDraw}!`;
+    match.lastBurst = { id: Date.now(), text: `REV +${match.pendingDraw}!` };
   } else if (card.value === 'hit2') {
     match.pendingDraw = 2;
     match.pendingDrawMin = 0;
@@ -680,7 +731,7 @@ export function applySharedUnoPlay(
 }
 
 export function applySharedUnoDraw(match: SharedUnoMatch, actorId: string): boolean {
-  if (!match.started || match.winnerIndex !== null) return false;
+  if (!match.started || match.winnerIndex !== null || match.pendingRoulette) return false;
   const actorIdx = match.currentTurn;
   const actor = match.players[actorIdx];
   if (!actor || actor.id !== actorId || actor.eliminated) return false;
@@ -787,6 +838,45 @@ export function applySharedUnoDraw(match: SharedUnoMatch, actorId: string): bool
   return true;
 }
 
+export function applySharedUnoRoulette(
+  match: SharedUnoMatch,
+  actorId: string,
+  chosenColor: UnoColor
+): boolean {
+  if (!match.started || match.winnerIndex !== null || !match.pendingRoulette) return false;
+  const { victimIdx, victimId } = match.pendingRoulette;
+  if (actorId !== victimId) return false;
+  const victim = match.players[victimIdx];
+  if (!victim || victim.eliminated) return false;
+
+  const color: UnoColor = UNO_COLORS.includes(chosenColor) ? chosenColor : 'red';
+  match.pendingRoulette = null;
+  match.activeColor = color;
+
+  let pulledCount = 0;
+  while (victim.hand.length < 25) {
+    const res = drawFromMatchPile(match.drawPile, match.discardPile, 1);
+    if (res.drawn.length === 0) break;
+    const pulled = res.drawn[0];
+    victim.hand.push(pulled);
+    victim.saidUno = false;
+    match.drawPile = res.nextDraw;
+    match.discardPile = res.nextDiscard;
+    pulledCount++;
+    if (pulled.color === color) {
+      break;
+    }
+  }
+
+  const mercyRes = checkMercyElimination(match, victimIdx);
+  if (mercyRes === 'WIN') return true;
+
+  match.currentTurn = nextAliveIndex(match.players, victimIdx, match.direction, 1);
+  match.lastBurst = { id: Date.now(), text: `ROULETTE +${pulledCount}!` };
+  match.statusText = `${victim.name} pilih ${UNO_COLOR_LABELS[color]} di Roulette → tarik ${pulledCount} kartu!${mercyRes} Giliran ${match.players[match.currentTurn].name}.`;
+  return true;
+}
+
 export function applySharedUnoCall(match: SharedUnoMatch, actorId: string): boolean {
   if (!match.started || match.winnerIndex !== null) return false;
   const player = match.players.find((p) => p.id === actorId);
@@ -822,6 +912,7 @@ export function getSanitizedSharedUnoState(match: SharedUnoMatch, viewerId: stri
     direction: match.direction,
     pendingDraw: match.pendingDraw,
     pendingDrawMin: match.pendingDrawMin,
+    pendingRoulette: match.pendingRoulette ?? null,
     winnerIndex: match.winnerIndex,
     lastBurst: match.lastBurst,
     lastLauncherEvent: match.lastLauncherEvent ?? null,

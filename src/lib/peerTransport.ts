@@ -4,7 +4,9 @@ import {
   applySharedUnoCall,
   applySharedUnoDraw,
   applySharedUnoPlay,
+  applySharedUnoRoulette,
   chooseBestAiCard,
+  chooseBestAiColor,
   createSharedUnoMatch,
   getSanitizedSharedUnoState,
   type SharedUnoMatch,
@@ -208,19 +210,23 @@ function scheduleUnoBotTurnIfNeeded(room: HostRoomState): void {
     const active = room.uno.players[room.uno.currentTurn];
     if (!active || !active.isBot || active.eliminated) return;
 
-    const topCard = room.uno.discardPile[room.uno.discardPile.length - 1];
-    const decision = chooseBestAiCard(
-      active.hand,
-      topCard,
-      room.uno.activeColor,
-      room.uno.pendingDraw,
-      room.uno.pendingDrawMin,
-      room.uno.variant
-    );
-    if (decision) {
-      applySharedUnoPlay(room.uno, active.id, decision.card.id, decision.chosenColor);
+    if (room.uno.pendingRoulette && room.uno.pendingRoulette.victimId === active.id) {
+      applySharedUnoRoulette(room.uno, active.id, chooseBestAiColor(active.hand));
     } else {
-      applySharedUnoDraw(room.uno, active.id);
+      const topCard = room.uno.discardPile[room.uno.discardPile.length - 1];
+      const decision = chooseBestAiCard(
+        active.hand,
+        topCard,
+        room.uno.activeColor,
+        room.uno.pendingDraw,
+        room.uno.pendingDrawMin,
+        room.uno.variant
+      );
+      if (decision) {
+        applySharedUnoPlay(room.uno, active.id, decision.card.id, decision.chosenColor);
+      } else {
+        applySharedUnoDraw(room.uno, active.id);
+      }
     }
     broadcastUnoState(room);
     scheduleUnoBotTurnIfNeeded(room);
@@ -399,6 +405,19 @@ function handleRoomAction(
     case 'uno:draw': {
       if (room.gameId !== 'uno' || !room.uno) return;
       const ok = applySharedUnoDraw(room.uno, senderId);
+      if (!ok) {
+        ack?.({ ok: false });
+        return;
+      }
+      broadcastUnoState(room);
+      scheduleUnoBotTurnIfNeeded(room);
+      ack?.({ ok: true });
+      return;
+    }
+
+    case 'uno:roulette': {
+      if (room.gameId !== 'uno' || !room.uno) return;
+      const ok = applySharedUnoRoulette(room.uno, senderId, payload?.chosenColor);
       if (!ok) {
         ack?.({ ok: false });
         return;

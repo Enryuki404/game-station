@@ -10,6 +10,7 @@ import {
   applyUnoCall,
   applyUnoDraw,
   applyUnoPlay,
+  applyUnoRoulette,
   getSanitizedUnoState,
   scheduleUnoBotTurnIfNeeded,
   startUnoMatch,
@@ -306,6 +307,19 @@ io.on('connection', (socket) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'uno') return;
     const ok = applyUnoDraw(room, socket.id);
+    if (!ok) {
+      ack?.({ ok: false });
+      return;
+    }
+    broadcastUnoState(room);
+    scheduleUnoBotTurnIfNeeded(room, () => broadcastUnoState(room));
+    ack?.({ ok: true });
+  });
+
+  socket.on('uno:roulette', ({ code, chosenColor }, ack) => {
+    const room = rooms.get(String(code || '').toUpperCase());
+    if (!room || room.gameId !== 'uno') return;
+    const ok = applyUnoRoulette(room, socket.id, chosenColor);
     if (!ok) {
       ack?.({ ok: false });
       return;

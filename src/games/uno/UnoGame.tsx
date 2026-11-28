@@ -14,13 +14,16 @@ import {
   applySharedUnoCall,
   applySharedUnoDraw,
   applySharedUnoPlay,
+  applySharedUnoRoulette,
   chooseBestAiCard,
+  chooseBestAiColor,
   createSharedUnoMatch,
   isCardPlayable,
   isSevenZeroVariant,
   UNO_COLOR_LABELS,
   UNO_COLORS,
   UNO_VARIANT_META,
+  type PendingRoulette,
   type SharedUnoMatch,
   type UnoCard,
   type UnoColor,
@@ -64,6 +67,7 @@ interface OnlineUnoState {
   direction: 1 | -1;
   pendingDraw: number;
   pendingDrawMin: number;
+  pendingRoulette?: PendingRoulette | null;
   winnerIndex: number | null;
   lastBurst: { id: number; text: string } | null;
   lastLauncherEvent?: { id: number; cards: number; actorName: string } | null;
@@ -248,6 +252,10 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
         const active = prev.players[prev.currentTurn];
         if (!active || !active.isBot || active.eliminated) return prev;
         const next = cloneMatch(prev);
+        if (next.pendingRoulette && next.pendingRoulette.victimId === active.id) {
+          applySharedUnoRoulette(next, active.id, chooseBestAiColor(active.hand));
+          return next;
+        }
         const top = next.discardPile[next.discardPile.length - 1];
         const decision = chooseBestAiCard(
           active.hand,
@@ -304,6 +312,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
   const drawCount = isOnlinePlaying ? onlineUno!.drawCount : match.drawPile.length;
   const pendingDraw = isOnlinePlaying ? onlineUno!.pendingDraw : match.pendingDraw;
   const pendingDrawMin = isOnlinePlaying ? onlineUno!.pendingDrawMin : match.pendingDrawMin;
+  const pendingRoulette = isOnlinePlaying ? (onlineUno!.pendingRoulette ?? null) : (match.pendingRoulette ?? null);
   const currentTurnIdx = isOnlinePlaying ? onlineUno!.currentTurn : match.currentTurn;
   const winnerIdx = isOnlinePlaying ? onlineUno!.winnerIndex : match.winnerIndex;
   const statusText = isOnlinePlaying ? onlineUno!.statusText : match.statusText;
@@ -350,6 +359,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
     currentTurnIdx === mySeatIdx &&
     winnerIdx === null &&
     !myPlayerMeta?.eliminated &&
+    !pendingRoulette &&
     !activeWildCard &&
     !activeSwapCard;
 
@@ -391,8 +401,8 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
       return;
     }
 
-    // Wild cards open Color Picker EXCEPT in All Wild mode
-    if (card.color === 'wild' && activeVariant !== 'allwild') {
+    // Wild cards open Color Picker EXCEPT in All Wild mode or Color Roulette (victim picks color)
+    if (card.color === 'wild' && card.value !== 'wildRoulette' && activeVariant !== 'allwild') {
       sfx('click');
       if (isOnlinePlaying) setOnlineWildCard(card);
       else setPendingWildCard(card);
@@ -405,6 +415,20 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
   const handleWildSelect = (color: UnoColor) => {
     if (!activeWildCard) return;
     submitPlay(activeWildCard, color);
+  };
+
+  const handleRouletteSelect = (color: UnoColor) => {
+    if (!pendingRoulette) return;
+    sfx('card');
+    if (isOnlinePlaying && onlineSession) {
+      getSocket().emit('uno:roulette', { code: onlineSession.code, chosenColor: color });
+    } else {
+      setMatch((prev) => {
+        const next = cloneMatch(prev);
+        applySharedUnoRoulette(next, 'human', color);
+        return next;
+      });
+    }
   };
 
   const handleSwapSelect = (targetId: string) => {
@@ -937,6 +961,39 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                   className={`rounded-xl py-3 font-extrabold text-sm border bg-gradient-to-br ${COLOR_STYLES[color].bg} ${
                     color === 'yellow' ? 'text-slate-950' : 'text-white'
                   } shadow-lg hover:scale-[1.03] transition cursor-pointer`}
+                >
+                  {UNO_COLOR_LABELS[color]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wild Color Roulette Victim Modal */}
+      {pendingRoulette && pendingRoulette.victimIdx === mySeatIdx && winnerIdx === null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-amber-400/50 bg-slate-900 p-5 shadow-2xl animate-pop-in space-y-4 text-center">
+            <div className="space-y-1">
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-[11px] font-black uppercase tracking-wider text-amber-300">
+                Color Roulette!
+              </span>
+              <h3 className="text-lg font-bold text-white">
+                {pendingRoulette.playedBy} melempar Roulette!
+              </h3>
+              <p className="text-xs text-slate-300">
+                Pilih 1 warna — kamu akan menarik kartu terus sampai mendapat warna tersebut!
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {UNO_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => handleRouletteSelect(color)}
+                  className={`rounded-xl py-3 font-extrabold text-sm border bg-gradient-to-br ${COLOR_STYLES[color].bg} ${
+                    color === 'yellow' ? 'text-slate-950' : 'text-white'
+                  } shadow-lg hover:scale-[1.03] transition cursor-pointer btn-tactile`}
                 >
                   {UNO_COLOR_LABELS[color]}
                 </button>

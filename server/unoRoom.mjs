@@ -58,7 +58,7 @@ function normalizeVariant(raw) {
 
 function getDrawPower(val) {
   if (val === 'draw2') return 2;
-  if (val === 'wild4') return 4;
+  if (val === 'wild4' || val === 'wildRev4') return 4;
   if (val === 'wild6') return 6;
   if (val === 'wild10') return 10;
   return 0;
@@ -131,6 +131,8 @@ export function createUnoDeck(variant = 'classic') {
   if (variant === 'nomercy') {
     for (let i = 0; i < 4; i++) {
       deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild6' });
+      deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wildRoulette' });
+      deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wildRev4' });
     }
     for (let i = 0; i < 2; i++) {
       deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild10' });
@@ -191,10 +193,20 @@ function formatUnoVal(val) {
   if (val === 'hit2') return 'Hit 2';
   if (val === 'wild') return 'Wild';
   if (val === 'wildAllHit') return 'Wild All Hit';
+  if (val === 'wildRoulette') return 'Color Roulette';
+  if (val === 'wildRev4') return 'Reverse +4';
   if (val === 'wild4') return '+4 Wild';
   if (val === 'wild6') return '+6 Wild';
   if (val === 'wild10') return '+10 Wild';
   return val;
+}
+
+function chooseBestColor(hand) {
+  const counts = { red: 0, blue: 0, green: 0, yellow: 0 };
+  for (const c of hand) {
+    if (c.color !== 'wild') counts[c.color]++;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
 function chooseBotCard(hand, topCard, activeColor, pendingDraw = 0, pendingDrawMin = 0, variant = 'classic') {
@@ -203,10 +215,12 @@ function chooseBotCard(hand, topCard, activeColor, pendingDraw = 0, pendingDrawM
   const score = (c) => {
     if (c.value === 'wildAllHit') return 58;
     if (c.value === 'discardAll') return 55;
+    if (c.value === 'wildRoulette') return 50;
     if (c.value === 'skipAll') return 48;
     if (c.value === 'hit2') return 44;
     if (c.value === 'wild10') return pendingDraw > 0 ? 60 : 42;
     if (c.value === 'wild6') return pendingDraw > 0 ? 52 : 38;
+    if (c.value === 'wildRev4') return pendingDraw > 0 ? 50 : 36;
     if (c.value === 'draw2') return 40;
     if (c.value === 'skip' || c.value === 'reverse') return 35;
     if (c.color !== 'wild') return 20 + (Number.isNaN(Number(c.value)) ? 0 : Number(c.value));
@@ -215,12 +229,7 @@ function chooseBotCard(hand, topCard, activeColor, pendingDraw = 0, pendingDrawM
   };
   playable.sort((a, b) => score(b) - score(a));
   const chosen = playable[0];
-  const counts = { red: 0, blue: 0, green: 0, yellow: 0 };
-  for (const c of hand) {
-    if (c.id !== chosen.id && c.color !== 'wild') counts[c.color]++;
-  }
-  const chosenColor = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
-  return { card: chosen, chosenColor };
+  return { card: chosen, chosenColor: chooseBestColor(hand.filter((c) => c.id !== chosen.id)) };
 }
 
 function checkMercy(u, targetIdx) {
@@ -306,6 +315,7 @@ export function startUnoMatch(room, fillBots, variantRaw = 'classic') {
     direction: 1,
     pendingDraw: 0,
     pendingDrawMin: 0,
+    pendingRoulette: null,
     winnerIndex: null,
     lastBurst: null,
     lastLauncherEvent: null,
@@ -317,7 +327,7 @@ export function startUnoMatch(room, fillBots, variantRaw = 'classic') {
 
 export function applyUnoPlay(room, actorId, cardId, chosenColor, swapTargetId) {
   const u = room.uno;
-  if (!u || !u.started || u.winnerIndex !== null) return false;
+  if (!u || !u.started || u.winnerIndex !== null || u.pendingRoulette) return false;
   const actorIdx = u.currentTurn;
   const actor = u.players[actorIdx];
   if (!actor || actor.id !== actorId || actor.eliminated) return false;
@@ -346,7 +356,9 @@ export function applyUnoPlay(room, actorId, cardId, chosenColor, swapTargetId) {
   }
 
   const validColor = u.variant === 'allwild' ? 'red' : UNO_COLORS.includes(chosenColor) ? chosenColor : 'red';
-  u.activeColor = card.color === 'wild' ? validColor : card.color;
+  if (card.value !== 'wildRoulette') {
+    u.activeColor = card.color === 'wild' ? validColor : card.color;
+  }
 
   let penaltyMsg = '';
   if (actor.hand.length === 1 && !actor.isBot && !actor.saidUno) {
@@ -365,6 +377,23 @@ export function applyUnoPlay(room, actorId, cardId, chosenColor, swapTargetId) {
     u.pendingDrawMin = 0;
     u.lastBurst = { id: Date.now(), text: `${actor.name} MENANG!` };
     u.statusText = `${actor.name} menang LAST ONE!`;
+    return true;
+  }
+
+  if (card.value === 'wildRoulette') {
+    const mercyActorEarly = checkMercy(u, actorIdx);
+    if (mercyActorEarly === 'WIN') return true;
+    const victimIdx = nextAliveIndex(u.players, actorIdx, u.direction, 1);
+    const victim = u.players[victimIdx];
+    u.pendingRoulette = {
+      victimIdx,
+      victimId: victim.id,
+      victimName: victim.name,
+      playedBy: actor.name,
+    };
+    u.currentTurn = victimIdx;
+    u.lastBurst = { id: Date.now(), text: 'COLOR ROULETTE!' };
+    u.statusText = `${actor.name} mainkan Color Roulette!${penaltyMsg}${mercyActorEarly} ${victim.name} harus memilih warna!`;
     return true;
   }
 
@@ -425,6 +454,15 @@ export function applyUnoPlay(room, actorId, cardId, chosenColor, swapTargetId) {
     step = 2;
     effectNote = ` — ${skipped.name} dilewati!`;
     u.lastBurst = { id: Date.now(), text: 'SKIP!' };
+  } else if (card.value === 'wildRev4') {
+    if (aliveCount > 2) {
+      u.direction = u.direction * -1;
+    }
+    u.pendingDraw += 4;
+    u.pendingDrawMin = Math.max(u.pendingDrawMin, 4);
+    step = 1;
+    effectNote = ` — Reverse & Stack +${u.pendingDraw}!`;
+    u.lastBurst = { id: Date.now(), text: `REV +${u.pendingDraw}!` };
   } else if (card.value === 'hit2') {
     u.pendingDraw = 2;
     u.pendingDrawMin = 0;
@@ -498,7 +536,7 @@ export function applyUnoPlay(room, actorId, cardId, chosenColor, swapTargetId) {
 
 export function applyUnoDraw(room, actorId) {
   const u = room.uno;
-  if (!u || !u.started || u.winnerIndex !== null) return false;
+  if (!u || !u.started || u.winnerIndex !== null || u.pendingRoulette) return false;
   const actorIdx = u.currentTurn;
   const actor = u.players[actorIdx];
   if (!actor || actor.id !== actorId || actor.eliminated) return false;
@@ -598,6 +636,40 @@ export function applyUnoDraw(room, actorId) {
   return true;
 }
 
+export function applyUnoRoulette(room, actorId, chosenColor) {
+  const u = room.uno;
+  if (!u || !u.started || u.winnerIndex !== null || !u.pendingRoulette) return false;
+  const { victimIdx, victimId } = u.pendingRoulette;
+  if (actorId !== victimId) return false;
+  const victim = u.players[victimIdx];
+  if (!victim || victim.eliminated) return false;
+
+  const color = UNO_COLORS.includes(chosenColor) ? chosenColor : 'red';
+  u.pendingRoulette = null;
+  u.activeColor = color;
+
+  let pulledCount = 0;
+  while (victim.hand.length < 25) {
+    const res = drawFromPile(u.drawPile, u.discardPile, 1);
+    if (res.drawn.length === 0) break;
+    const pulled = res.drawn[0];
+    victim.hand.push(pulled);
+    victim.saidUno = false;
+    u.drawPile = res.nextDraw;
+    u.discardPile = res.nextDiscard;
+    pulledCount++;
+    if (pulled.color === color) break;
+  }
+
+  const mercyRes = checkMercy(u, victimIdx);
+  if (mercyRes === 'WIN') return true;
+
+  u.currentTurn = nextAliveIndex(u.players, victimIdx, u.direction, 1);
+  u.lastBurst = { id: Date.now(), text: `ROULETTE +${pulledCount}!` };
+  u.statusText = `${victim.name} pilih ${COLOR_LABELS[color]} di Roulette → tarik ${pulledCount} kartu!${mercyRes} Giliran ${u.players[u.currentTurn].name}.`;
+  return true;
+}
+
 export function applyUnoCall(room, actorId) {
   const u = room.uno;
   if (!u || !u.started || u.winnerIndex !== null) return false;
@@ -625,12 +697,16 @@ export function scheduleUnoBotTurnIfNeeded(room, onBroadcast) {
     const active = room.uno.players[room.uno.currentTurn];
     if (!active || !active.isBot || active.eliminated) return;
 
-    const topCard = room.uno.discardPile[room.uno.discardPile.length - 1];
-    const decision = chooseBotCard(active.hand, topCard, room.uno.activeColor, room.uno.pendingDraw, room.uno.pendingDrawMin, room.uno.variant);
-    if (decision) {
-      applyUnoPlay(room, active.id, decision.card.id, decision.chosenColor);
+    if (room.uno.pendingRoulette && room.uno.pendingRoulette.victimId === active.id) {
+      applyUnoRoulette(room, active.id, chooseBestColor(active.hand));
     } else {
-      applyUnoDraw(room, active.id);
+      const topCard = room.uno.discardPile[room.uno.discardPile.length - 1];
+      const decision = chooseBotCard(active.hand, topCard, room.uno.activeColor, room.uno.pendingDraw, room.uno.pendingDrawMin, room.uno.variant);
+      if (decision) {
+        applyUnoPlay(room, active.id, decision.card.id, decision.chosenColor);
+      } else {
+        applyUnoDraw(room, active.id);
+      }
     }
     onBroadcast();
     scheduleUnoBotTurnIfNeeded(room, onBroadcast);
@@ -664,6 +740,7 @@ export function getSanitizedUnoState(room, viewerId) {
     direction: u.direction,
     pendingDraw: u.pendingDraw,
     pendingDrawMin: u.pendingDrawMin,
+    pendingRoulette: u.pendingRoulette ?? null,
     winnerIndex: u.winnerIndex,
     lastBurst: u.lastBurst,
     lastLauncherEvent: u.lastLauncherEvent ?? null,

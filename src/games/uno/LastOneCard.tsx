@@ -43,6 +43,10 @@ function cornerLabel(val: UnoValue): string {
       return 'W';
     case 'wildAllHit':
       return '⚡ALL';
+    case 'wildRoulette':
+      return '◉';
+    case 'wildRev4':
+      return '⇄+4';
     case 'wild4':
       return '+4';
     case 'wild6':
@@ -89,6 +93,23 @@ const ReverseIcon: React.FC<{ className?: string }> = ({ className = 'w-7 h-7 sm
       />
       <path d="M 21 38 L 9.5 31.5 L 21 25 Z" fill="currentColor" />
     </g>
+  </svg>
+);
+
+const RouletteIcon: React.FC<{ className?: string }> = ({ className = 'w-7 h-7 sm:w-9 sm:h-9' }) => (
+  <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+    {/* 4-color roulette wheel quadrants */}
+    <path d="M24 24 L24 8 A16 16 0 0 0 8 24 Z" fill="#ef4444" />
+    <path d="M24 24 L40 24 A16 16 0 0 0 24 8 Z" fill="#0ea5e9" />
+    <path d="M24 24 L8 24 A16 16 0 0 0 24 40 Z" fill="#facc15" />
+    <path d="M24 24 L24 40 A16 16 0 0 0 40 24 Z" fill="#10b981" />
+    {/* Golden rim & dividers */}
+    <circle cx="24" cy="24" r="16" fill="none" stroke="#fde047" strokeWidth="2.8" />
+    <line x1="24" y1="8" x2="24" y2="40" stroke="#0f172a" strokeWidth="1.6" />
+    <line x1="8" y1="24" x2="40" y2="24" stroke="#0f172a" strokeWidth="1.6" />
+    {/* Center spinner hub & top pointer */}
+    <circle cx="24" cy="24" r="4.5" fill="#0f172a" stroke="#ffffff" strokeWidth="1.8" />
+    <path d="M20 4 L28 4 L24 10 Z" fill="#ffffff" />
   </svg>
 );
 
@@ -208,6 +229,32 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
     );
   }
 
+  if (card.value === 'wildRoulette') {
+    return (
+      <div className="flex flex-col items-center justify-center leading-none gap-0.5">
+        <RouletteIcon className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" />
+        <span className="font-black text-[7px] sm:text-[8px] tracking-wider text-amber-200 uppercase">ROULETTE</span>
+      </div>
+    );
+  }
+
+  if (card.value === 'wildRev4') {
+    return (
+      <div className="flex flex-col items-center justify-center leading-none gap-0.5">
+        <div className="flex items-center gap-0.5">
+          <ReverseIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white drop-shadow" />
+          <span className="font-black text-sm sm:text-base tracking-tight text-white drop-shadow">+4</span>
+        </div>
+        <div className="flex gap-0.5 mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        </div>
+      </div>
+    );
+  }
+
   if (card.value === 'wild') {
     return (
       <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
@@ -306,6 +353,8 @@ export const LastOneCard: React.FC<{
       <SkipAllIcon className={cornerIconCls} />
     ) : card.value === 'reverse' ? (
       <ReverseIcon className={cornerIconCls} />
+    ) : card.value === 'wildRoulette' ? (
+      <RouletteIcon className={cornerIconCls} />
     ) : (
       <span>{corner}</span>
     );
