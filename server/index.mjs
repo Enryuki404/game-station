@@ -269,7 +269,7 @@ io.on('connection', (socket) => {
   });
 
   // ---- UNO EVENTS ----
-  socket.on('uno:start', ({ code, fillBots }, ack) => {
+  socket.on('uno:start', ({ code, fillBots, variant }, ack) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'uno') {
       ack?.({ ok: false, error: 'Room LAST ONE! tidak ditemukan.' });
@@ -283,16 +283,16 @@ io.on('connection', (socket) => {
       ack?.({ ok: false, error: 'Minimal 2 pemain atau aktifkan Isi Bot.' });
       return;
     }
-    startUnoMatch(room, Boolean(fillBots));
+    startUnoMatch(room, Boolean(fillBots), variant);
     broadcastUnoState(room);
     scheduleUnoBotTurnIfNeeded(room, () => broadcastUnoState(room));
     ack?.({ ok: true });
   });
 
-  socket.on('uno:play', ({ code, cardId, chosenColor }, ack) => {
+  socket.on('uno:play', ({ code, cardId, chosenColor, swapTargetId }, ack) => {
     const room = rooms.get(String(code || '').toUpperCase());
     if (!room || room.gameId !== 'uno') return;
-    const ok = applyUnoPlay(room, socket.id, cardId, chosenColor);
+    const ok = applyUnoPlay(room, socket.id, cardId, chosenColor, swapTargetId);
     if (!ok) {
       ack?.({ ok: false });
       return;

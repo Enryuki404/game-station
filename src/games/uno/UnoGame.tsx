@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BellRing, Globe, Play, RotateCw, Trophy, Users } from 'lucide-react';
+import { BellRing, Flame, Globe, Play, RotateCw, ShieldAlert, Trophy, Users } from 'lucide-react';
 import { ConfettiBurst } from '../../components/ConfettiBurst';
 import { GameShell } from '../../components/GameShell';
 import { OnlineRoomModal } from '../../components/OnlineRoomModal';
 import { useGameStation } from '../../context/GameStationContext';
-import { shuffleDeck } from '../../lib/cards';
 import {
   getSocket,
   leaveOnlineRoom,
@@ -12,15 +11,20 @@ import {
   type OnlineSession,
 } from '../../lib/multiplayer';
 import {
+  applySharedUnoCall,
+  applySharedUnoDraw,
+  applySharedUnoPlay,
   chooseBestAiCard,
-  createUnoDeck,
-  formatUnoValue,
+  createSharedUnoMatch,
   isCardPlayable,
+  isSevenZeroVariant,
   UNO_COLOR_LABELS,
   UNO_COLORS,
+  UNO_VARIANT_META,
+  type SharedUnoMatch,
   type UnoCard,
   type UnoColor,
-  type UnoPlayer,
+  type UnoVariant,
 } from './unoEngine';
 import { LastOneCard, LastOneCardBack, LastOneDrawDeck } from './LastOneCard';
 
@@ -30,19 +34,8 @@ interface UnoGameProps {
   initialOnline?: boolean;
 }
 
-interface UnoState {
-  players: UnoPlayer[];
-  drawPile: UnoCard[];
-  discardPile: UnoCard[];
-  activeColor: UnoColor;
-  currentTurn: number;
-  direction: 1 | -1;
-  winnerIndex: number | null;
-  pendingWildCard: UnoCard | null;
-  statusText: string;
-}
-
 interface OnlineUnoState {
+  variant: UnoVariant;
   started: boolean;
   mySeatIdx: number;
   myHand: UnoCard[];
@@ -52,6 +45,7 @@ interface OnlineUnoState {
     seatIdx: number;
     cardCount: number;
     saidUno: boolean;
+    eliminated: boolean;
     isBot: boolean;
     connected: boolean;
   }>;
@@ -60,6 +54,8 @@ interface OnlineUnoState {
   activeColor: UnoColor;
   currentTurn: number;
   direction: 1 | -1;
+  pendingDraw: number;
+  pendingDrawMin: number;
   winnerIndex: number | null;
   lastBurst: { id: number; text: string } | null;
   statusText: string;
@@ -88,66 +84,36 @@ const COLOR_STYLES: Record<UnoColor, { bg: string; ring: string; pill: string }>
   },
 };
 
-function createInitialState(aiCount: number): UnoState {
-  const deck = createUnoDeck();
+const ALL_VARIANTS: UnoVariant[] = ['classic', 'stack', 'sevenzero', 'nomercy', 'allwild'];
+
+function createOfflineMatch(aiCount: number, variant: UnoVariant): SharedUnoMatch {
   const botNames = ['Bot Raka', 'Bot Sinta', 'Bot Budi', 'Bot Dewi', 'Bot Dimas'];
   const clampedAi = Math.max(1, Math.min(5, aiCount));
-  const names = ['Kamu', ...botNames.slice(0, clampedAi)];
-  const players: UnoPlayer[] = names.map((name, i) => ({
-    id: `p-${i}`,
-    name,
-    isHuman: i === 0,
-    hand: deck.splice(0, 7),
-    saidUno: false,
-  }));
-
-  let firstIdx = deck.findIndex((c) => c.color !== 'wild' && !['draw2', 'skip', 'reverse'].includes(c.value));
-  if (firstIdx === -1) firstIdx = 0;
-  const [firstCard] = deck.splice(firstIdx, 1);
-
-  return {
-    players,
-    drawPile: deck,
-    discardPile: [firstCard],
-    activeColor: firstCard.color === 'wild' ? 'red' : firstCard.color,
-    currentTurn: 0,
-    direction: 1,
-    winnerIndex: null,
-    pendingWildCard: null,
-    statusText: 'Giliran kamu! Mainkan kartu yang cocok atau klik Dek untuk mengambil.',
-  };
+  const seats = [
+    { id: 'human', name: 'Kamu', isBot: false },
+    ...botNames.slice(0, clampedAi).map((name, i) => ({ id: `bot-${i + 1}`, name, isBot: true })),
+  ];
+  return createSharedUnoMatch(variant, seats);
 }
 
-function drawFromPile(
-  drawPile: UnoCard[],
-  discardPile: UnoCard[],
-  count: number
-): { drawn: UnoCard[]; nextDraw: UnoCard[]; nextDiscard: UnoCard[] } {
-  let pool = [...drawPile];
-  let discard = [...discardPile];
-  const drawn: UnoCard[] = [];
-
-  for (let i = 0; i < count; i++) {
-    if (pool.length === 0) {
-      if (discard.length <= 1) break;
-      const top = discard[discard.length - 1];
-      const recycled = shuffleDeck(discard.slice(0, -1));
-      pool = recycled;
-      discard = [top];
-    }
-    const card = pool.shift();
-    if (card) drawn.push(card);
-  }
-
-  return { drawn, nextDraw: pool, nextDiscard: discard };
+function cloneMatch(m: SharedUnoMatch): SharedUnoMatch {
+  return {
+    ...m,
+    players: m.players.map((p) => ({ ...p, hand: [...p.hand] })),
+    drawPile: [...m.drawPile],
+    discardPile: [...m.discardPile],
+  };
 }
 
 export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initialOnline }) => {
   const { addChips, recordGame, sfx } = useGameStation();
   const startInOnline = Boolean(initialRoomCode || initialOnline);
   const [mode, setMode] = useState<'ai' | 'online'>(startInOnline ? 'online' : 'ai');
+  const [variant, setVariant] = useState<UnoVariant>('classic');
   const [aiCount, setAiCount] = useState<number>(3);
-  const [state, setState] = useState<UnoState>(() => createInitialState(3));
+  const [match, setMatch] = useState<SharedUnoMatch>(() => createOfflineMatch(3, 'classic'));
+  const [pendingWildCard, setPendingWildCard] = useState<UnoCard | null>(null);
+  const [pendingSwapCard, setPendingSwapCard] = useState<UnoCard | null>(null);
   const [actionBurst, setActionBurst] = useState<{ id: number; text: string; tone: string } | null>(null);
   const [confettiKey, setConfettiKey] = useState(0);
 
@@ -155,32 +121,37 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
   const [onlineSession, setOnlineSession] = useState<OnlineSession | null>(null);
   const [onlineUno, setOnlineUno] = useState<OnlineUnoState | null>(null);
   const [onlineWildCard, setOnlineWildCard] = useState<UnoCard | null>(null);
+  const [onlineSwapCard, setOnlineSwapCard] = useState<UnoCard | null>(null);
   const [fillBots, setFillBots] = useState(true);
   const [roomModalOpen, setRoomModalOpen] = useState(startInOnline);
 
   const rewardGrantedRef = useRef(false);
   const lastBurstIdRef = useRef<number | null>(null);
 
-  const triggerBurst = useCallback((text: string, tone = 'bg-amber-400 text-slate-950') => {
+  const triggerBurst = useCallback((text: string, tone = 'bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950') => {
     setActionBurst({ id: Date.now() + Math.random(), text, tone });
   }, []);
 
   const resetGame = useCallback(
-    (nextMode: 'ai' | 'online' = mode, nextAiCount: number = aiCount) => {
+    (nextMode: 'ai' | 'online' = mode, nextAiCount: number = aiCount, nextVariant: UnoVariant = variant) => {
       rewardGrantedRef.current = false;
       setActionBurst(null);
+      setPendingWildCard(null);
+      setPendingSwapCard(null);
+      setOnlineWildCard(null);
+      setOnlineSwapCard(null);
       if (nextMode !== 'online') {
         if (onlineSession) {
           leaveOnlineRoom();
           setOnlineSession(null);
           setOnlineUno(null);
         }
-        setState(createInitialState(nextAiCount));
+        setMatch(createOfflineMatch(nextAiCount, nextVariant));
       } else if (onlineSession && onlineSession.room.hostId === onlineSession.playerId) {
-        getSocket().emit('uno:start', { code: onlineSession.code, fillBots });
+        getSocket().emit('uno:start', { code: onlineSession.code, fillBots, variant: nextVariant });
       }
     },
-    [aiCount, fillBots, mode, onlineSession]
+    [aiCount, fillBots, mode, onlineSession, variant]
   );
 
   // Online socket listeners
@@ -195,10 +166,12 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
     const onUnoState = (uState: OnlineUnoState) => {
       sfx('card');
       setOnlineUno(uState);
+      if (uState.variant) setVariant(uState.variant);
       setOnlineWildCard(null);
+      setOnlineSwapCard(null);
       if (uState.lastBurst && uState.lastBurst.id !== lastBurstIdRef.current) {
         lastBurstIdRef.current = uState.lastBurst.id;
-        triggerBurst(uState.lastBurst.text, 'bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950');
+        triggerBurst(uState.lastBurst.text);
       }
       if (uState.winnerIndex !== null && !rewardGrantedRef.current) {
         rewardGrantedRef.current = true;
@@ -223,137 +196,20 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
     };
   }, [addChips, mode, onlineSession?.code, recordGame, sfx, triggerBurst]);
 
-  const nextIndex = (idx: number, dir: 1 | -1, total: number, steps = 1) =>
-    (((idx + dir * steps) % total) + total) % total;
-
-  const applyPlay = useCallback(
-    (playerIdx: number, card: UnoCard, chosenColor?: UnoColor) => {
-      setState((prev) => {
-        if (prev.winnerIndex !== null) return prev;
-        const players = prev.players.map((p) => ({ ...p, hand: [...p.hand] }));
-        const actor = players[playerIdx];
-        const cardIdx = actor.hand.findIndex((c) => c.id === card.id);
-        if (cardIdx === -1) return prev;
-
-        actor.hand.splice(cardIdx, 1);
-        let drawPile = [...prev.drawPile];
-        const discardPile = [...prev.discardPile, card];
-        let direction = prev.direction;
-        const activeColor: UnoColor = card.color === 'wild' ? chosenColor ?? 'red' : card.color;
-
-        let penaltyMsg = '';
-        let finalDiscard = discardPile;
-        if (actor.hand.length === 1 && actor.isHuman && !actor.saidUno) {
-          const pen = drawFromPile(drawPile, discardPile, 2);
-          actor.hand.push(...pen.drawn);
-          drawPile = pen.nextDraw;
-          finalDiscard = pen.nextDiscard;
-          penaltyMsg = ' (Lupa tekan LAST ONE! +2 kartu)';
-        }
-        if (actor.hand.length === 1 && !actor.isHuman) {
-          actor.saidUno = true;
-        }
-        if (actor.hand.length !== 1) {
-          actor.saidUno = false;
-        }
-
-        if (actor.hand.length === 0) {
-          return {
-            ...prev,
-            players,
-            drawPile,
-            discardPile: finalDiscard,
-            activeColor,
-            winnerIndex: playerIdx,
-            pendingWildCard: null,
-            statusText: `${actor.name} menang LAST ONE!`,
-          };
-        }
-
-        let step = 1;
-        let effectNote = '';
-        const total = players.length;
-
-        if (card.value === 'reverse') {
-          if (total === 2) {
-            step = 2;
-            effectNote = ' — Reverse (Giliran lanjut!)';
-          } else {
-            direction = (direction * -1) as 1 | -1;
-            effectNote = ' — Arah berbalik!';
-          }
-        } else if (card.value === 'skip') {
-          const skipped = players[nextIndex(playerIdx, direction, total, 1)];
-          step = 2;
-          effectNote = ` — ${skipped.name} dilewati!`;
-        } else if (card.value === 'draw2' || card.value === 'wild4') {
-          const amount = card.value === 'draw2' ? 2 : 4;
-          const victimIdx = nextIndex(playerIdx, direction, total, 1);
-          const res = drawFromPile(drawPile, finalDiscard, amount);
-          players[victimIdx].hand.push(...res.drawn);
-          players[victimIdx].saidUno = false;
-          drawPile = res.nextDraw;
-          finalDiscard = res.nextDiscard;
-          step = 2;
-          effectNote = ` — ${players[victimIdx].name} ambil +${amount}!`;
-        }
-
-        const nextTurn = nextIndex(playerIdx, direction, total, step);
-        const nextPlayer = players[nextTurn];
-        const colorNote = card.color === 'wild' ? ` (Warna: ${UNO_COLOR_LABELS[activeColor]})` : '';
-
-        return {
-          ...prev,
-          players,
-          drawPile,
-          discardPile: finalDiscard,
-          activeColor,
-          direction,
-          currentTurn: nextTurn,
-          pendingWildCard: null,
-          statusText: `${actor.name} mainkan ${formatUnoValue(card.value)}${colorNote}${effectNote}${penaltyMsg} Giliran ${nextPlayer.name}.`,
-        };
-      });
-      sfx('card');
-      if (card.value === 'skip') triggerBurst('SKIP!', 'bg-rose-500 text-white');
-      else if (card.value === 'reverse') triggerBurst('REVERSE!', 'bg-sky-500 text-white');
-      else if (card.value === 'draw2') triggerBurst('+2 KARTU!', 'bg-amber-400 text-slate-950');
-      else if (card.value === 'wild4') triggerBurst('+4 WILD!', 'bg-gradient-to-r from-rose-500 to-amber-400 text-white');
-      else if (card.value === 'wild') triggerBurst('WILD!', 'bg-indigo-500 text-white');
-    },
-    [sfx, triggerBurst]
-  );
-
-  const applyDraw = useCallback(
-    (playerIdx: number) => {
-      setState((prev) => {
-        if (prev.winnerIndex !== null) return prev;
-        const players = prev.players.map((p) => ({ ...p, hand: [...p.hand] }));
-        const actor = players[playerIdx];
-        const res = drawFromPile(prev.drawPile, prev.discardPile, 1);
-        actor.hand.push(...res.drawn);
-        actor.saidUno = false;
-
-        const nextTurn = nextIndex(playerIdx, prev.direction, players.length, 1);
-        return {
-          ...prev,
-          players,
-          drawPile: res.nextDraw,
-          discardPile: res.nextDiscard,
-          currentTurn: nextTurn,
-          statusText: `${actor.name} mengambil 1 kartu. Giliran ${players[nextTurn].name}.`,
-        };
-      });
-      sfx('card');
-    },
-    [sfx]
-  );
+  // Burst feedback for offline AI & player actions
+  useEffect(() => {
+    if (mode === 'online' || !match.lastBurst) return;
+    if (match.lastBurst.id !== lastBurstIdRef.current) {
+      lastBurstIdRef.current = match.lastBurst.id;
+      triggerBurst(match.lastBurst.text);
+    }
+  }, [match.lastBurst, mode, triggerBurst]);
 
   // Winner reward & stats (offline vs Bot)
   useEffect(() => {
-    if (mode !== 'online' && state.winnerIndex !== null && !rewardGrantedRef.current) {
+    if (mode !== 'online' && match.winnerIndex !== null && !rewardGrantedRef.current) {
       rewardGrantedRef.current = true;
-      const humanWon = state.winnerIndex === 0;
+      const humanWon = match.winnerIndex === 0;
       recordGame('uno', humanWon);
       if (humanWon) {
         addChips(500);
@@ -363,98 +219,160 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
         sfx('lose');
       }
     }
-  }, [mode, state.winnerIndex, addChips, recordGame, sfx]);
+  }, [mode, match.winnerIndex, addChips, recordGame, sfx]);
 
   // AI Turn Loop (offline)
   useEffect(() => {
-    if (mode === 'online' || state.winnerIndex !== null || state.pendingWildCard) return;
-    const current = state.players[state.currentTurn];
-    if (!current || current.isHuman) return;
+    if (mode === 'online' || match.winnerIndex !== null || pendingWildCard || pendingSwapCard) return;
+    const current = match.players[match.currentTurn];
+    if (!current || !current.isBot || current.eliminated) return;
 
     const timer = window.setTimeout(() => {
-      const topCard = state.discardPile[state.discardPile.length - 1];
-      const decision = chooseBestAiCard(current.hand, topCard, state.activeColor);
-      if (decision) {
-        applyPlay(state.currentTurn, decision.card, decision.chosenColor);
-      } else {
-        applyDraw(state.currentTurn);
-      }
+      setMatch((prev) => {
+        if (prev.winnerIndex !== null) return prev;
+        const active = prev.players[prev.currentTurn];
+        if (!active || !active.isBot || active.eliminated) return prev;
+        const next = cloneMatch(prev);
+        const top = next.discardPile[next.discardPile.length - 1];
+        const decision = chooseBestAiCard(
+          active.hand,
+          top,
+          next.activeColor,
+          next.pendingDraw,
+          next.pendingDrawMin,
+          next.variant
+        );
+        if (decision) {
+          applySharedUnoPlay(next, active.id, decision.card.id, decision.chosenColor);
+        } else {
+          applySharedUnoDraw(next, active.id);
+        }
+        return next;
+      });
+      sfx('card');
     }, 850);
 
     return () => window.clearTimeout(timer);
-  }, [mode, state.currentTurn, state.winnerIndex, state.pendingWildCard, state.players, state.discardPile, state.activeColor, applyPlay, applyDraw]);
+  }, [mode, match, pendingWildCard, pendingSwapCard, sfx]);
 
-  // Derived view state for both Offline & Online (anti-cheat: only own cards shown!)
+  // Derived view state for both Offline & Online
   const isOnlinePlaying = mode === 'online' && Boolean(onlineUno?.started);
+  const activeVariant: UnoVariant = isOnlinePlaying ? onlineUno!.variant : variant;
   const mySeatIdx = isOnlinePlaying ? onlineUno!.mySeatIdx : 0;
-  const myHand = isOnlinePlaying ? onlineUno!.myHand : state.players[0].hand;
+  const myHand = isOnlinePlaying ? onlineUno!.myHand : match.players[0].hand;
   const myPlayerMeta = isOnlinePlaying
     ? onlineUno!.players[mySeatIdx]
-    : { name: state.players[0].name, saidUno: state.players[0].saidUno };
+    : {
+        id: match.players[0].id,
+        name: match.players[0].name,
+        saidUno: match.players[0].saidUno,
+        eliminated: match.players[0].eliminated,
+      };
 
   const opponentSeats = isOnlinePlaying
     ? onlineUno!.players.filter((p) => p.seatIdx !== mySeatIdx)
-    : state.players.slice(1).map((p, idx) => ({
+    : match.players.slice(1).map((p) => ({
         id: p.id,
         name: p.name,
-        seatIdx: idx + 1,
+        seatIdx: p.seatIdx,
         cardCount: p.hand.length,
         saidUno: p.saidUno,
-        isBot: true,
-        connected: true,
+        eliminated: p.eliminated,
+        isBot: p.isBot,
+        connected: p.connected,
       }));
 
-  const topCard = isOnlinePlaying ? onlineUno!.topCard : state.discardPile[state.discardPile.length - 1];
-  const activeColor = isOnlinePlaying ? onlineUno!.activeColor : state.activeColor;
-  const direction = isOnlinePlaying ? onlineUno!.direction : state.direction;
-  const drawCount = isOnlinePlaying ? onlineUno!.drawCount : state.drawPile.length;
-  const currentTurnIdx = isOnlinePlaying ? onlineUno!.currentTurn : state.currentTurn;
-  const winnerIdx = isOnlinePlaying ? onlineUno!.winnerIndex : state.winnerIndex;
-  const statusText = isOnlinePlaying ? onlineUno!.statusText : state.statusText;
-  const activeWildCard = isOnlinePlaying ? onlineWildCard : state.pendingWildCard;
+  const aliveOpponents = opponentSeats.filter((p) => !p.eliminated);
+  const topCard = isOnlinePlaying ? onlineUno!.topCard : match.discardPile[match.discardPile.length - 1];
+  const activeColor = isOnlinePlaying ? onlineUno!.activeColor : match.activeColor;
+  const direction = isOnlinePlaying ? onlineUno!.direction : match.direction;
+  const drawCount = isOnlinePlaying ? onlineUno!.drawCount : match.drawPile.length;
+  const pendingDraw = isOnlinePlaying ? onlineUno!.pendingDraw : match.pendingDraw;
+  const pendingDrawMin = isOnlinePlaying ? onlineUno!.pendingDrawMin : match.pendingDrawMin;
+  const currentTurnIdx = isOnlinePlaying ? onlineUno!.currentTurn : match.currentTurn;
+  const winnerIdx = isOnlinePlaying ? onlineUno!.winnerIndex : match.winnerIndex;
+  const statusText = isOnlinePlaying ? onlineUno!.statusText : match.statusText;
+  const activeWildCard = isOnlinePlaying ? onlineWildCard : pendingWildCard;
+  const activeSwapCard = isOnlinePlaying ? onlineSwapCard : pendingSwapCard;
 
   const isHumanTurn =
     (mode === 'online' ? isOnlinePlaying : true) &&
     currentTurnIdx === mySeatIdx &&
     winnerIdx === null &&
-    !activeWildCard;
-  const hasPlayableCard = isHumanTurn && myHand.some((c) => isCardPlayable(c, topCard, activeColor));
+    !myPlayerMeta?.eliminated &&
+    !activeWildCard &&
+    !activeSwapCard;
+
+  const hasPlayableCard =
+    isHumanTurn &&
+    myHand.some((c) => isCardPlayable(c, topCard, activeColor, pendingDraw, pendingDrawMin, activeVariant));
+
+  const submitPlay = (card: UnoCard, chosenColor?: UnoColor, swapTargetId?: string) => {
+    sfx('card');
+    if (isOnlinePlaying && onlineSession) {
+      getSocket().emit('uno:play', {
+        code: onlineSession.code,
+        cardId: card.id,
+        chosenColor,
+        swapTargetId,
+      });
+      setOnlineWildCard(null);
+      setOnlineSwapCard(null);
+    } else {
+      setMatch((prev) => {
+        const next = cloneMatch(prev);
+        applySharedUnoPlay(next, 'human', card.id, chosenColor, swapTargetId);
+        return next;
+      });
+      setPendingWildCard(null);
+      setPendingSwapCard(null);
+    }
+  };
 
   const handleCardClick = (card: UnoCard) => {
-    if (!isHumanTurn || !isCardPlayable(card, topCard, activeColor)) return;
-    if (card.color === 'wild') {
+    if (!isHumanTurn) return;
+    if (!isCardPlayable(card, topCard, activeColor, pendingDraw, pendingDrawMin, activeVariant)) return;
+
+    // 7-0 Chaos & No Mercy: Playing 7 with 2+ alive opponents opens Swap Target selector
+    if (isSevenZeroVariant(activeVariant) && card.value === '7' && myHand.length > 1 && aliveOpponents.length >= 2) {
       sfx('click');
-      if (isOnlinePlaying) setOnlineWildCard(card);
-      else setState((prev) => ({ ...prev, pendingWildCard: card }));
+      if (isOnlinePlaying) setOnlineSwapCard(card);
+      else setPendingSwapCard(card);
       return;
     }
-    if (isOnlinePlaying && onlineSession) {
-      getSocket().emit('uno:play', { code: onlineSession.code, cardId: card.id });
-    } else {
-      applyPlay(0, card);
+
+    // Wild cards open Color Picker EXCEPT in All Wild mode
+    if (card.color === 'wild' && activeVariant !== 'allwild') {
+      sfx('click');
+      if (isOnlinePlaying) setOnlineWildCard(card);
+      else setPendingWildCard(card);
+      return;
     }
+
+    submitPlay(card, activeVariant === 'allwild' ? 'red' : undefined);
   };
 
   const handleWildSelect = (color: UnoColor) => {
     if (!activeWildCard) return;
-    if (isOnlinePlaying && onlineSession) {
-      getSocket().emit('uno:play', {
-        code: onlineSession.code,
-        cardId: activeWildCard.id,
-        chosenColor: color,
-      });
-      setOnlineWildCard(null);
-    } else {
-      applyPlay(0, activeWildCard, color);
-    }
+    submitPlay(activeWildCard, color);
+  };
+
+  const handleSwapSelect = (targetId: string) => {
+    if (!activeSwapCard) return;
+    submitPlay(activeSwapCard, undefined, targetId);
   };
 
   const handleDrawClick = () => {
     if (!isHumanTurn) return;
+    sfx('card');
     if (isOnlinePlaying && onlineSession) {
       getSocket().emit('uno:draw', { code: onlineSession.code });
     } else {
-      applyDraw(0);
+      setMatch((prev) => {
+        const next = cloneMatch(prev);
+        applySharedUnoDraw(next, 'human');
+        return next;
+      });
     }
   };
 
@@ -464,10 +382,10 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
       getSocket().emit('uno:call', { code: onlineSession.code });
       return;
     }
-    triggerBurst('LAST ONE!', 'bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950');
-    setState((prev) => {
-      const players = prev.players.map((p, idx) => (idx === 0 ? { ...p, saidUno: true } : p));
-      return { ...prev, players, statusText: 'Kamu berteriak "LAST ONE!"' };
+    setMatch((prev) => {
+      const next = cloneMatch(prev);
+      applySharedUnoCall(next, 'human');
+      return next;
     });
   };
 
@@ -476,20 +394,24 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
       ? ''
       : isOnlinePlaying
         ? onlineUno!.players[winnerIdx]?.name ?? ''
-        : state.players[winnerIdx]?.name ?? '';
+        : match.players[winnerIdx]?.name ?? '';
+
+  const isHostOrOffline =
+    mode !== 'online' || !onlineSession || onlineSession.room.hostId === onlineSession.playerId;
 
   return (
     <GameShell
-      title="LAST ONE!"
-      subtitle="Cocokkan warna atau angka, jangan lupa teriak LAST ONE!"
+      title={`LAST ONE! — ${UNO_VARIANT_META[activeVariant].label}`}
+      subtitle={UNO_VARIANT_META[activeVariant].shortDesc}
       onBack={() => {
         leaveOnlineRoom();
         onBack();
       }}
-      onRestart={() => resetGame(mode)}
+      onRestart={() => resetGame(mode, aiCount, activeVariant)}
       controls={
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs">
+          {/* Mode Tabs: Online | vs AI */}
+          <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -508,7 +430,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               onClick={() => {
                 sfx('click');
                 setMode('ai');
-                resetGame('ai', aiCount);
+                resetGame('ai', aiCount, variant);
               }}
               className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition ${
                 mode === 'ai' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
@@ -518,8 +440,31 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
             </button>
           </div>
 
+          {/* 5 Rule Variants */}
+          <div className="inline-flex rounded-xl border border-slate-700 bg-slate-800/80 p-0.5 text-xs shrink-0">
+            {ALL_VARIANTS.map((vKey) => (
+              <button
+                key={vKey}
+                type="button"
+                disabled={!isHostOrOffline || isOnlinePlaying}
+                onClick={() => {
+                  sfx('click');
+                  setVariant(vKey);
+                  if (mode === 'ai') {
+                    resetGame('ai', aiCount, vKey);
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold whitespace-nowrap cursor-pointer transition disabled:opacity-60 ${
+                  activeVariant === vKey ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                {UNO_VARIANT_META[vKey].label}
+              </button>
+            ))}
+          </div>
+
           {mode === 'ai' && (
-            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-xs">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-xs shrink-0">
               <span className="text-slate-400 font-semibold pr-1">Musuh AI:</span>
               {[1, 2, 3, 4, 5].map((cnt) => (
                 <button
@@ -528,7 +473,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                   onClick={() => {
                     sfx('click');
                     setAiCount(cnt);
-                    resetGame('ai', cnt);
+                    resetGame('ai', cnt, variant);
                   }}
                   className={`px-2 py-1 rounded-lg font-bold cursor-pointer ${
                     aiCount === cnt ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white'
@@ -544,7 +489,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
             <button
               type="button"
               onClick={() => setRoomModalOpen(true)}
-              className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/25 cursor-pointer"
+              className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/25 cursor-pointer shrink-0"
             >
               {onlineSession ? `Room: ${onlineSession.code}` : 'Buat / Gabung Room'}
             </button>
@@ -552,16 +497,14 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
         </div>
       }
       rules={[
-        'Mainkan kartu yang memiliki warna, angka, atau simbol yang sama dengan kartu teratas di meja.',
-        'Klik langsung tumpukan Dek di tengah meja untuk mengambil kartu.',
-        'Mode Online P2P (2–6 Pemain): Setiap pemain hanya melihat kartu tangannya sendiri di bawah, sedangkan kartu lawan tertutup (anti-intip).',
-        'Saat tersisa 2 kartu sebelum giliranmu berakhir ke 1 kartu, tekan tombol "LAST ONE!" agar tidak kena penalti +2 kartu!',
+        ...UNO_VARIANT_META[activeVariant].rules,
+        'Mode Online P2P (2–6 Pemain): Setiap pemain hanya melihat kartu tangannya sendiri (anti-intip).',
         'Menang memberi hadiah +500 Chip.',
       ]}
     >
       {/* Online Waiting Room Panel before Host starts */}
       {mode === 'online' && !isOnlinePlaying ? (
-        <div className="max-w-lg mx-auto rounded-3xl border border-slate-800 bg-slate-900/80 p-6 space-y-5 text-center shadow-2xl">
+        <div className="max-w-lg mx-auto rounded-3xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 space-y-5 text-center shadow-2xl">
           {!onlineSession ? (
             <div className="space-y-4">
               <h2 className="text-xl font-extrabold text-white">Mabar LAST ONE! Online (2–6 Pemain)</h2>
@@ -603,6 +546,28 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
 
               {onlineSession.room.hostId === onlineSession.playerId ? (
                 <div className="space-y-3">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2 text-left">
+                    <p className="text-xs font-semibold text-slate-400">Mode Permainan:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ALL_VARIANTS.map((vKey) => (
+                        <button
+                          key={vKey}
+                          type="button"
+                          onClick={() => {
+                            sfx('click');
+                            setVariant(vKey);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition ${
+                            variant === vKey ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300 hover:text-white'
+                          }`}
+                        >
+                          {UNO_VARIANT_META[vKey].label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-400">{UNO_VARIANT_META[variant].shortDesc}</p>
+                  </div>
+
                   <label className="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                     <input
                       type="checkbox"
@@ -625,7 +590,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                       disabled={!fillBots && onlineSession.room.players.length < 2}
                       onClick={() => {
                         rewardGrantedRef.current = false;
-                        getSocket().emit('uno:start', { code: onlineSession.code, fillBots });
+                        getSocket().emit('uno:start', { code: onlineSession.code, fillBots, variant });
                       }}
                       className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 py-2.5 text-sm font-extrabold text-slate-950 hover:bg-emerald-400 disabled:opacity-40 cursor-pointer btn-tactile"
                     >
@@ -634,7 +599,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-amber-300 font-semibold">Menunggu Host memulai permainan...</p>
+                <p className="text-sm text-amber-300 font-semibold">Menunggu Host memilih mode &amp; memulai permainan...</p>
               )}
             </div>
           )}
@@ -656,45 +621,72 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
             }`}
           >
             {opponentSeats.map((opp) => {
-              const active = currentTurnIdx === opp.seatIdx && winnerIdx === null;
+              const active = currentTurnIdx === opp.seatIdx && winnerIdx === null && !opp.eliminated;
               return (
                 <div
                   key={opp.id}
                   className={`rounded-xl sm:rounded-2xl border p-2 sm:p-3 flex items-center justify-between gap-1.5 sm:gap-2 overflow-hidden min-w-0 transition ${
-                    active
-                      ? 'border-amber-400/70 bg-amber-500/10 shadow-lg shadow-amber-500/10'
-                      : 'border-slate-800 bg-slate-950/50'
+                    opp.eliminated
+                      ? 'border-rose-900/50 bg-rose-950/20 opacity-55'
+                      : active
+                        ? 'border-amber-400/70 bg-amber-500/10 shadow-lg shadow-amber-500/10'
+                        : 'border-slate-800 bg-slate-950/50'
                   }`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0 rounded-full ${active ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'}`} />
+                      <span
+                        className={`w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0 rounded-full ${
+                          opp.eliminated ? 'bg-rose-500' : active ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
+                        }`}
+                      />
                       <span className="font-bold text-xs sm:text-sm text-white truncate">
                         {opp.name} {!opp.connected ? '(Offline)' : ''}
                       </span>
                     </div>
-                    <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">{opp.cardCount} kartu tersisa</p>
+                    <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">
+                      {opp.eliminated ? 'KO (25+ kartu)' : `${opp.cardCount} kartu tersisa`}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {Array.from({ length: Math.min(opp.cardCount, 3) }).map((_, i) => (
-                      <LastOneCardBack key={i} size="mini" />
-                    ))}
-                  </div>
+                  {!opp.eliminated && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {Array.from({ length: Math.min(opp.cardCount, 3) }).map((_, i) => (
+                        <LastOneCardBack key={i} size="mini" />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
           {/* Center Table */}
-          <div className="felt-surface relative rounded-3xl border border-emerald-700/40 p-5 sm:p-7 flex flex-col items-center gap-4 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-center gap-3 text-xs">
-              <span className={`px-3 py-1 rounded-full border font-semibold transition-colors ${COLOR_STYLES[activeColor].pill}`}>
-                Warna Aktif: {UNO_COLOR_LABELS[activeColor]}
-              </span>
+          <div className="felt-surface relative rounded-3xl border border-emerald-700/40 p-4 sm:p-7 flex flex-col items-center gap-4 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs">
+              {activeVariant !== 'allwild' ? (
+                <span className={`px-3 py-1 rounded-full border font-semibold transition-colors ${COLOR_STYLES[activeColor].pill}`}>
+                  Warna Aktif: {UNO_COLOR_LABELS[activeColor]}
+                </span>
+              ) : (
+                <span className="px-3 py-1 rounded-full border border-violet-400/40 bg-violet-500/20 text-violet-200 font-semibold">
+                  Mode All Wild
+                </span>
+              )}
               <span className="px-3 py-1 rounded-full border border-slate-700 bg-slate-900/70 text-slate-200 inline-flex items-center gap-1.5 font-medium">
                 <RotateCw className={`w-3.5 h-3.5 transition-transform duration-300 ${direction === -1 ? '-scale-x-100' : ''}`} />
                 {direction === 1 ? 'Searah Jarum Jam' : 'Berlawanan Jarum Jam'}
               </span>
+              {pendingDraw > 0 && (
+                <span className="px-3 py-1 rounded-full border border-rose-400/60 bg-rose-500/25 text-rose-200 inline-flex items-center gap-1 font-extrabold animate-pulse">
+                  <Flame className="w-3.5 h-3.5 text-amber-300" />
+                  Tumpukan Penalti: +{pendingDraw}
+                </span>
+              )}
+              {activeVariant === 'nomercy' && (
+                <span className="px-2.5 py-1 rounded-full border border-amber-400/35 bg-amber-500/15 text-amber-200 inline-flex items-center gap-1 font-semibold">
+                  <ShieldAlert className="w-3.5 h-3.5" /> Batas KO: 25
+                </span>
+              )}
             </div>
 
             <div className="relative flex items-center justify-center gap-6 sm:gap-10 py-2">
@@ -702,15 +694,20 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                 drawCount={drawCount}
                 canDraw={isHumanTurn}
                 hasPlayableCard={hasPlayableCard}
+                pendingDraw={pendingDraw}
                 onDraw={handleDrawClick}
               />
 
               <div className="relative">
-                <div className={`absolute -inset-2 rounded-2xl blur-md opacity-45 transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
+                {activeVariant !== 'allwild' && (
+                  <div className={`absolute -inset-2 rounded-2xl blur-md opacity-45 transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
+                )}
                 <div key={topCard.id} className="relative animate-card-throw">
                   <LastOneCard card={topCard} size="md" />
                 </div>
-                <div className={`absolute -bottom-2 -right-2 w-5 h-5 rounded-full border-2 border-white shadow-md transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
+                {activeVariant !== 'allwild' && (
+                  <div className={`absolute -bottom-2 -right-2 w-5 h-5 rounded-full border-2 border-white shadow-md transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
+                )}
               </div>
 
               {actionBurst && (
@@ -734,11 +731,17 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${isHumanTurn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    myPlayerMeta?.eliminated ? 'bg-rose-500' : isHumanTurn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
+                  }`}
+                />
                 <h2 className="text-sm sm:text-base font-bold text-white">
-                  {myPlayerMeta?.name ?? 'Kartumu'} ({myHand.length} kartu)
+                  {myPlayerMeta?.eliminated
+                    ? `${myPlayerMeta.name} (KO — Tersingkir)`
+                    : `${myPlayerMeta?.name ?? 'Kartumu'} (${myHand.length}${activeVariant === 'nomercy' ? '/25' : ''} kartu)`}
                 </h2>
-                {myPlayerMeta?.saidUno && (
+                {myPlayerMeta?.saidUno && !myPlayerMeta?.eliminated && (
                   <span className="px-2 py-0.5 text-[11px] font-extrabold rounded-full bg-amber-400 text-slate-950">
                     LAST ONE AKTIF
                   </span>
@@ -746,22 +749,27 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               </div>
 
               <div className="flex items-center gap-2">
-                {myHand.length <= 2 && myHand.length >= 1 && !myPlayerMeta?.saidUno && winnerIdx === null && (
-                  <button
-                    type="button"
-                    onClick={handleCallUno}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-rose-500 px-4 py-1.5 text-xs sm:text-sm font-extrabold text-slate-950 shadow-lg animate-pulse-glow cursor-pointer"
-                  >
-                    <BellRing className="w-4 h-4" />
-                    TERIAK LAST ONE!
-                  </button>
-                )}
+                {myHand.length <= 2 &&
+                  myHand.length >= 1 &&
+                  !myPlayerMeta?.saidUno &&
+                  !myPlayerMeta?.eliminated &&
+                  winnerIdx === null && (
+                    <button
+                      type="button"
+                      onClick={handleCallUno}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-rose-500 px-4 py-1.5 text-xs sm:text-sm font-extrabold text-slate-950 shadow-lg animate-pulse-glow cursor-pointer"
+                    >
+                      <BellRing className="w-4 h-4" />
+                      TERIAK LAST ONE!
+                    </button>
+                  )}
               </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2 pb-1">
               {myHand.map((card) => {
-                const playable = isHumanTurn && isCardPlayable(card, topCard, activeColor);
+                const playable =
+                  isHumanTurn && isCardPlayable(card, topCard, activeColor, pendingDraw, pendingDrawMin, activeVariant);
                 return (
                   <LastOneCard
                     key={card.id}
@@ -799,6 +807,31 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
         </div>
       )}
 
+      {/* 7-Swap Target Modal */}
+      {activeSwapCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl animate-pop-in space-y-4 text-center">
+            <div>
+              <h3 className="text-lg font-bold text-white">Kartu 7 — Tukar Kartu!</h3>
+              <p className="text-xs text-slate-400 mt-1">Pilih lawan untuk bertukar seluruh kartu tangan:</p>
+            </div>
+            <div className="space-y-2">
+              {aliveOpponents.map((opp) => (
+                <button
+                  key={opp.id}
+                  type="button"
+                  onClick={() => handleSwapSelect(opp.id)}
+                  className="w-full flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-2.5 text-sm font-bold text-white hover:border-amber-400 hover:bg-slate-800 cursor-pointer btn-tactile"
+                >
+                  <span>{opp.name}</span>
+                  <span className="text-xs font-mono-num text-amber-300">{opp.cardCount} kartu</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Winner Banner Modal */}
       {winnerIdx !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -817,7 +850,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
             {(mode !== 'online' || onlineSession?.room.hostId === onlineSession?.playerId) && (
               <button
                 type="button"
-                onClick={() => resetGame(mode)}
+                onClick={() => resetGame(mode, aiCount, activeVariant)}
                 className="w-full rounded-xl bg-indigo-600 py-2.5 font-bold text-white hover:bg-indigo-500 transition cursor-pointer"
               >
                 Main Lagi

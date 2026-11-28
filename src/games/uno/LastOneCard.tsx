@@ -28,14 +28,22 @@ function cornerLabel(val: UnoValue): string {
   switch (val) {
     case 'skip':
       return '⊘';
+    case 'skipAll':
+      return '⊘⊘';
     case 'reverse':
       return '⇄';
+    case 'discardAll':
+      return 'ALL';
     case 'draw2':
       return '+2';
     case 'wild':
       return 'W';
     case 'wild4':
       return '+4';
+    case 'wild6':
+      return '+6';
+    case 'wild10':
+      return '+10';
     default:
       return val;
   }
@@ -50,6 +58,27 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
       <svg viewBox="0 0 48 48" className="w-6 h-6 sm:w-8 sm:h-8 drop-shadow-md" aria-hidden="true">
         <circle cx="24" cy="24" r="15" fill="none" stroke={strokeMain} strokeWidth="4.5" />
         <line x1="13" y1="35" x2="35" y2="13" stroke={strokeMain} strokeWidth="4.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (card.value === 'skipAll') {
+    return (
+      <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
+        <circle cx="20" cy="26" r="11" fill="none" stroke={strokeMain} strokeWidth="3.5" opacity="0.65" />
+        <circle cx="27" cy="21" r="12" fill="none" stroke={strokeMain} strokeWidth="4" />
+        <line x1="18" y1="30" x2="36" y2="12" stroke={strokeMain} strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (card.value === 'discardAll') {
+    return (
+      <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
+        <rect x="8" y="13" width="14" height="20" rx="2.5" fill="none" stroke={strokeMain} strokeWidth="2.5" opacity="0.55" transform="rotate(-10 15 23)" />
+        <rect x="14" y="12" width="14" height="20" rx="2.5" fill="none" stroke={strokeMain} strokeWidth="2.5" opacity="0.8" />
+        <rect x="20" y="11" width="14" height="20" rx="2.5" fill={isYellow ? '#fef08a' : 'rgba(255,255,255,0.28)'} stroke={strokeMain} strokeWidth="2.5" transform="rotate(8 27 21)" />
+        <path d="M26 35 L40 35 L36 31 M40 35 L36 39" fill="none" stroke={strokeMain} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
@@ -141,6 +170,38 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
         <rect x="21" y="12" width="12" height="17" rx="2.5" fill="#facc15" stroke="#ffffff" strokeWidth="1.8" transform="rotate(8 27 20)" />
         <rect x="28" y="16" width="12" height="17" rx="2.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.8" transform="rotate(19 34 24)" />
       </svg>
+    );
+  }
+
+  if (card.value === 'wild6') {
+    return (
+      <div className="flex flex-col items-center justify-center leading-none">
+        <span className="font-black text-lg sm:text-xl tracking-tight text-violet-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+          +6
+        </span>
+        <div className="flex gap-0.5 mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        </div>
+      </div>
+    );
+  }
+
+  if (card.value === 'wild10') {
+    return (
+      <div className="flex flex-col items-center justify-center leading-none">
+        <span className="font-black text-base sm:text-lg tracking-tight text-rose-400 drop-shadow-[0_2px_6px_rgba(244,63,94,0.65)]">
+          +10
+        </span>
+        <div className="flex gap-0.5 mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        </div>
+      </div>
     );
   }
 
@@ -312,8 +373,10 @@ export const LastOneDrawDeck: React.FC<{
   drawCount: number;
   canDraw: boolean;
   hasPlayableCard: boolean;
+  pendingDraw?: number;
   onDraw: () => void;
-}> = ({ drawCount, canDraw, hasPlayableCard, onDraw }) => {
+}> = ({ drawCount, canDraw, hasPlayableCard, pendingDraw = 0, onDraw }) => {
+  const mustDrawPenalty = canDraw && pendingDraw > 0 && !hasPlayableCard;
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div className="relative pt-1.5 pr-2">
@@ -336,12 +399,14 @@ export const LastOneDrawDeck: React.FC<{
           disabled={!canDraw}
           onClick={onDraw}
           aria-label="Ambil kartu dari dek"
-          title={canDraw ? 'Klik dek untuk mengambil 1 kartu' : 'Tunggu giliranmu'}
+          title={canDraw ? 'Klik dek untuk mengambil kartu' : 'Tunggu giliranmu'}
           className={`relative block rounded-lg transition-all duration-200 btn-tactile ${
             canDraw
-              ? !hasPlayableCard
-                ? 'cursor-pointer hover:-translate-y-1.5 hover:scale-[1.04] ring-2 ring-amber-400 shadow-[0_0_24px_rgba(251,191,36,0.45)] animate-pulse-glow'
-                : 'cursor-pointer hover:-translate-y-1.5 hover:scale-[1.04] ring-2 ring-emerald-300/70 hover:ring-amber-300 shadow-[0_0_18px_rgba(16,185,129,0.3)]'
+              ? mustDrawPenalty
+                ? 'cursor-pointer hover:-translate-y-1.5 hover:scale-[1.04] ring-2 ring-rose-400 shadow-[0_0_24px_rgba(244,63,94,0.55)] animate-pulse-glow'
+                : !hasPlayableCard
+                  ? 'cursor-pointer hover:-translate-y-1.5 hover:scale-[1.04] ring-2 ring-amber-400 shadow-[0_0_24px_rgba(251,191,36,0.45)] animate-pulse-glow'
+                  : 'cursor-pointer hover:-translate-y-1.5 hover:scale-[1.04] ring-2 ring-emerald-300/70 hover:ring-amber-300 shadow-[0_0_18px_rgba(16,185,129,0.3)]'
               : 'brightness-75 saturate-75 cursor-not-allowed'
           }`}
         >
@@ -351,12 +416,18 @@ export const LastOneDrawDeck: React.FC<{
 
       <span
         className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold font-mono-num border ${
-          canDraw && !hasPlayableCard
-            ? 'bg-amber-400 text-slate-950 border-amber-200'
-            : 'bg-black/40 text-slate-200 border-white/15'
+          mustDrawPenalty
+            ? 'bg-rose-500 text-white border-rose-200'
+            : canDraw && !hasPlayableCard
+              ? 'bg-amber-400 text-slate-950 border-amber-200'
+              : 'bg-black/40 text-slate-200 border-white/15'
         }`}
       >
-        {canDraw ? `Tap Dek (${drawCount})` : `Dek (${drawCount})`}
+        {canDraw && pendingDraw > 0
+          ? `Ambil +${pendingDraw}`
+          : canDraw
+            ? `Tap Dek (${drawCount})`
+            : `Dek (${drawCount})`}
       </span>
     </div>
   );

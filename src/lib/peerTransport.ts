@@ -1,14 +1,14 @@
 import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
 import { Chess } from 'chess.js';
-import { shuffleDeck } from './cards';
 import {
+  applySharedUnoCall,
+  applySharedUnoDraw,
+  applySharedUnoPlay,
   chooseBestAiCard,
-  createUnoDeck,
-  isCardPlayable,
-  UNO_COLOR_LABELS,
-  UNO_COLORS,
-  type UnoCard,
-  type UnoColor,
+  createSharedUnoMatch,
+  getSanitizedSharedUnoState,
+  type SharedUnoMatch,
+  type UnoVariant,
 } from '../games/uno/unoEngine';
 import type { MultiplayerGameId, MultiplayerRoomInfo, OnlineSession } from './multiplayer';
 
@@ -49,29 +49,6 @@ interface HostPlayer {
   conn: DataConnection | null;
 }
 
-interface HostUnoPlayer {
-  id: string;
-  name: string;
-  seatIdx: number;
-  isBot: boolean;
-  connected: boolean;
-  hand: UnoCard[];
-  saidUno: boolean;
-}
-
-interface HostUnoState {
-  started: boolean;
-  players: HostUnoPlayer[];
-  drawPile: UnoCard[];
-  discardPile: UnoCard[];
-  activeColor: UnoColor;
-  currentTurn: number;
-  direction: 1 | -1;
-  winnerIndex: number | null;
-  lastBurst: { id: number; text: string } | null;
-  statusText: string;
-}
-
 interface HostRoomState {
   code: string;
   gameId: MultiplayerGameId;
@@ -79,7 +56,7 @@ interface HostRoomState {
   maxPlayers: number;
   players: HostPlayer[];
   chess: Chess | null;
-  uno: HostUnoState | null;
+  uno: SharedUnoMatch | null;
   unoBotTimer: number | null;
   carromTurn: number;
   billiardTurn: number;
@@ -171,70 +148,17 @@ function broadcastEvent(room: HostRoomState, event: string, payload?: any, exclu
   }
 }
 
-// ---- Host Authoritative UNO Engine (2-6 Players) ----
-function drawFromUnoPile(drawPile: UnoCard[], discardPile: UnoCard[], count: number) {
-  let pool = [...drawPile];
-  let discard = [...discardPile];
-  const drawn: UnoCard[] = [];
-  for (let i = 0; i < count; i++) {
-    if (pool.length === 0) {
-      if (discard.length <= 1) break;
-      const top = discard[discard.length - 1];
-      pool = shuffleDeck(discard.slice(0, -1));
-      discard = [top];
-    }
-    const c = pool.shift();
-    if (c) drawn.push(c);
-  }
-  return { drawn, nextDraw: pool, nextDiscard: discard };
-}
+// ---- Host Authoritative LAST ONE! Engine (2-6 Players, 5 Variants) ----
+const VALID_UNO_VARIANTS = new Set<UnoVariant>(['classic', 'stack', 'sevenzero', 'nomercy', 'allwild']);
 
-function nextUnoIndex(idx: number, dir: 1 | -1, total: number, steps = 1): number {
-  return (((idx + dir * steps) % total) + total) % total;
-}
-
-function formatUnoVal(val: string): string {
-  if (val === 'skip') return 'Skip';
-  if (val === 'reverse') return 'Reverse';
-  if (val === 'draw2') return '+2';
-  if (val === 'wild') return 'Wild';
-  if (val === 'wild4') return '+4 Wild';
-  return val;
-}
-
-function getSanitizedUnoState(room: HostRoomState, viewerId: string) {
-  const u = room.uno;
-  if (!u) return null;
-  const mySeatIdx = u.players.findIndex((p) => p.id === viewerId);
-  const me = mySeatIdx >= 0 ? u.players[mySeatIdx] : null;
-  return {
-    started: u.started,
-    mySeatIdx,
-    myHand: me ? me.hand : [],
-    players: u.players.map((p) => ({
-      id: p.id,
-      name: p.name,
-      seatIdx: p.seatIdx,
-      cardCount: p.hand.length,
-      saidUno: p.saidUno,
-      isBot: p.isBot,
-      connected: p.connected,
-    })),
-    drawCount: u.drawPile.length,
-    topCard: u.discardPile[u.discardPile.length - 1],
-    activeColor: u.activeColor,
-    currentTurn: u.currentTurn,
-    direction: u.direction,
-    winnerIndex: u.winnerIndex,
-    lastBurst: u.lastBurst,
-    statusText: u.statusText,
-  };
+function normalizeUnoVariant(raw: unknown): UnoVariant {
+  return typeof raw === 'string' && VALID_UNO_VARIANTS.has(raw as UnoVariant) ? (raw as UnoVariant) : 'classic';
 }
 
 function broadcastUnoState(room: HostRoomState): void {
   if (!room.uno) return;
   for (const p of room.players) {
-    const sanitized = getSanitizedUnoState(room, p.id);
+    const sanitized = getSanitizedSharedUnoState(room.uno, p.id);
     if (p.id === room.hostId) {
       emitLocal('uno:state', sanitized);
     } else if (p.conn?.open) {
@@ -243,168 +167,29 @@ function broadcastUnoState(room: HostRoomState): void {
   }
 }
 
-function startUnoMatch(room: HostRoomState, fillBots: boolean): void {
+function startUnoMatch(room: HostRoomState, fillBots: boolean, variantRaw?: unknown): void {
   if (room.unoBotTimer !== null) {
     window.clearTimeout(room.unoBotTimer);
     room.unoBotTimer = null;
   }
 
-  const deck = createUnoDeck();
+  const variant = normalizeUnoVariant(variantRaw);
   const botNames = ['Bot Raka', 'Bot Sinta', 'Bot Budi', 'Bot Dewi', 'Bot Dimas'];
-  const players: HostUnoPlayer[] = room.players.map((p, idx) => ({
+  const seats: Array<{ id: string; name: string; isBot: boolean }> = room.players.map((p) => ({
     id: p.id,
     name: p.name,
-    seatIdx: idx,
     isBot: false,
-    connected: true,
-    hand: deck.splice(0, 7),
-    saidUno: false,
   }));
 
   if (fillBots) {
     let bIdx = 0;
-    while (players.length < 4 && bIdx < botNames.length) {
-      players.push({
-        id: `bot-${bIdx + 1}`,
-        name: botNames[bIdx],
-        seatIdx: players.length,
-        isBot: true,
-        connected: true,
-        hand: deck.splice(0, 7),
-        saidUno: false,
-      });
+    while (seats.length < 4 && bIdx < botNames.length) {
+      seats.push({ id: `bot-${bIdx + 1}`, name: botNames[bIdx], isBot: true });
       bIdx++;
     }
   }
 
-  let firstIdx = deck.findIndex((c) => c.color !== 'wild' && !['draw2', 'skip', 'reverse'].includes(c.value));
-  if (firstIdx === -1) firstIdx = 0;
-  const [firstCard] = deck.splice(firstIdx, 1);
-
-  room.uno = {
-    started: true,
-    players,
-    drawPile: deck,
-    discardPile: [firstCard],
-    activeColor: firstCard.color === 'wild' ? 'red' : firstCard.color,
-    currentTurn: 0,
-    direction: 1,
-    winnerIndex: null,
-    lastBurst: null,
-    statusText: `Permainan dimulai! Giliran ${players[0].name}.`,
-  };
-}
-
-function applyUnoPlay(room: HostRoomState, actorId: string, cardId: string, chosenColor?: UnoColor): boolean {
-  const u = room.uno;
-  if (!u || !u.started || u.winnerIndex !== null) return false;
-  const actorIdx = u.currentTurn;
-  const actor = u.players[actorIdx];
-  if (!actor || actor.id !== actorId) return false;
-
-  const cardIdx = actor.hand.findIndex((c) => c.id === cardId);
-  if (cardIdx === -1) return false;
-  const card = actor.hand[cardIdx];
-  const topCard = u.discardPile[u.discardPile.length - 1];
-  if (!isCardPlayable(card, topCard, u.activeColor)) return false;
-
-  actor.hand.splice(cardIdx, 1);
-  u.discardPile.push(card);
-
-  const validColor: UnoColor = chosenColor && UNO_COLORS.includes(chosenColor) ? chosenColor : 'red';
-  u.activeColor = card.color === 'wild' ? validColor : card.color;
-
-  let penaltyMsg = '';
-  if (actor.hand.length === 1 && !actor.isBot && !actor.saidUno) {
-    const pen = drawFromUnoPile(u.drawPile, u.discardPile, 2);
-    actor.hand.push(...pen.drawn);
-    u.drawPile = pen.nextDraw;
-    u.discardPile = pen.nextDiscard;
-    penaltyMsg = ' (Lupa tekan LAST ONE! +2 kartu)';
-  }
-  if (actor.hand.length === 1 && actor.isBot) {
-    actor.saidUno = true;
-  }
-  if (actor.hand.length !== 1) {
-    actor.saidUno = false;
-  }
-
-  if (actor.hand.length === 0) {
-    u.winnerIndex = actorIdx;
-    u.lastBurst = { id: Date.now(), text: `${actor.name} MENANG!` };
-    u.statusText = `${actor.name} menang LAST ONE!`;
-    return true;
-  }
-
-  let step = 1;
-  let effectNote = '';
-  const total = u.players.length;
-  u.lastBurst = null;
-
-  if (card.value === 'reverse') {
-    if (total === 2) {
-      step = 2;
-      effectNote = ' — Reverse (Giliran lanjut!)';
-    } else {
-      u.direction = (u.direction * -1) as 1 | -1;
-      effectNote = ' — Arah berbalik!';
-    }
-    u.lastBurst = { id: Date.now(), text: 'REVERSE!' };
-  } else if (card.value === 'skip') {
-    const skipped = u.players[nextUnoIndex(actorIdx, u.direction, total, 1)];
-    step = 2;
-    effectNote = ` — ${skipped.name} dilewati!`;
-    u.lastBurst = { id: Date.now(), text: 'SKIP!' };
-  } else if (card.value === 'draw2' || card.value === 'wild4') {
-    const amount = card.value === 'draw2' ? 2 : 4;
-    const victimIdx = nextUnoIndex(actorIdx, u.direction, total, 1);
-    const res = drawFromUnoPile(u.drawPile, u.discardPile, amount);
-    u.players[victimIdx].hand.push(...res.drawn);
-    u.players[victimIdx].saidUno = false;
-    u.drawPile = res.nextDraw;
-    u.discardPile = res.nextDiscard;
-    step = 2;
-    effectNote = ` — ${u.players[victimIdx].name} ambil +${amount}!`;
-    u.lastBurst = { id: Date.now(), text: amount === 2 ? '+2 KARTU!' : '+4 WILD!' };
-  } else if (card.value === 'wild') {
-    u.lastBurst = { id: Date.now(), text: 'WILD!' };
-  }
-
-  u.currentTurn = nextUnoIndex(actorIdx, u.direction, total, step);
-  const nextPlayer = u.players[u.currentTurn];
-  const colorNote = card.color === 'wild' ? ` (Warna: ${UNO_COLOR_LABELS[u.activeColor]})` : '';
-  u.statusText = `${actor.name} mainkan ${formatUnoVal(card.value)}${colorNote}${effectNote}${penaltyMsg} Giliran ${nextPlayer.name}.`;
-  return true;
-}
-
-function applyUnoDraw(room: HostRoomState, actorId: string): boolean {
-  const u = room.uno;
-  if (!u || !u.started || u.winnerIndex !== null) return false;
-  const actorIdx = u.currentTurn;
-  const actor = u.players[actorIdx];
-  if (!actor || actor.id !== actorId) return false;
-
-  const res = drawFromUnoPile(u.drawPile, u.discardPile, 1);
-  actor.hand.push(...res.drawn);
-  actor.saidUno = false;
-  u.drawPile = res.nextDraw;
-  u.discardPile = res.nextDiscard;
-  u.lastBurst = null;
-
-  u.currentTurn = nextUnoIndex(actorIdx, u.direction, u.players.length, 1);
-  u.statusText = `${actor.name} mengambil 1 kartu. Giliran ${u.players[u.currentTurn].name}.`;
-  return true;
-}
-
-function applyUnoCall(room: HostRoomState, actorId: string): boolean {
-  const u = room.uno;
-  if (!u || !u.started || u.winnerIndex !== null) return false;
-  const player = u.players.find((p) => p.id === actorId);
-  if (!player || player.hand.length > 2) return false;
-  player.saidUno = true;
-  u.lastBurst = { id: Date.now(), text: `${player.name}: LAST ONE!` };
-  u.statusText = `${player.name} berteriak "LAST ONE!"`;
-  return true;
+  room.uno = createSharedUnoMatch(variant, seats);
 }
 
 function scheduleUnoBotTurnIfNeeded(room: HostRoomState): void {
@@ -415,20 +200,27 @@ function scheduleUnoBotTurnIfNeeded(room: HostRoomState): void {
   const u = room.uno;
   if (!u || !u.started || u.winnerIndex !== null) return;
   const current = u.players[u.currentTurn];
-  if (!current || !current.isBot) return;
+  if (!current || !current.isBot || current.eliminated) return;
 
   room.unoBotTimer = window.setTimeout(() => {
     room.unoBotTimer = null;
     if (!room.uno || room.uno.winnerIndex !== null || hostRoom !== room) return;
     const active = room.uno.players[room.uno.currentTurn];
-    if (!active || !active.isBot) return;
+    if (!active || !active.isBot || active.eliminated) return;
 
     const topCard = room.uno.discardPile[room.uno.discardPile.length - 1];
-    const decision = chooseBestAiCard(active.hand, topCard, room.uno.activeColor);
+    const decision = chooseBestAiCard(
+      active.hand,
+      topCard,
+      room.uno.activeColor,
+      room.uno.pendingDraw,
+      room.uno.pendingDrawMin,
+      room.uno.variant
+    );
     if (decision) {
-      applyUnoPlay(room, active.id, decision.card.id, decision.chosenColor);
+      applySharedUnoPlay(room.uno, active.id, decision.card.id, decision.chosenColor);
     } else {
-      applyUnoDraw(room, active.id);
+      applySharedUnoDraw(room.uno, active.id);
     }
     broadcastUnoState(room);
     scheduleUnoBotTurnIfNeeded(room);
@@ -578,7 +370,7 @@ function handleRoomAction(
         ack?.({ ok: false, error: 'Minimal 2 pemain atau aktifkan Isi Bot.' });
         return;
       }
-      startUnoMatch(room, fillBots);
+      startUnoMatch(room, fillBots, payload?.variant);
       broadcastUnoState(room);
       scheduleUnoBotTurnIfNeeded(room);
       ack?.({ ok: true });
@@ -586,8 +378,14 @@ function handleRoomAction(
     }
 
     case 'uno:play': {
-      if (room.gameId !== 'uno') return;
-      const ok = applyUnoPlay(room, senderId, payload.cardId, payload.chosenColor);
+      if (room.gameId !== 'uno' || !room.uno) return;
+      const ok = applySharedUnoPlay(
+        room.uno,
+        senderId,
+        payload.cardId,
+        payload.chosenColor,
+        payload.swapTargetId
+      );
       if (!ok) {
         ack?.({ ok: false });
         return;
@@ -599,8 +397,8 @@ function handleRoomAction(
     }
 
     case 'uno:draw': {
-      if (room.gameId !== 'uno') return;
-      const ok = applyUnoDraw(room, senderId);
+      if (room.gameId !== 'uno' || !room.uno) return;
+      const ok = applySharedUnoDraw(room.uno, senderId);
       if (!ok) {
         ack?.({ ok: false });
         return;
@@ -612,8 +410,8 @@ function handleRoomAction(
     }
 
     case 'uno:call': {
-      if (room.gameId !== 'uno') return;
-      if (applyUnoCall(room, senderId)) {
+      if (room.gameId !== 'uno' || !room.uno) return;
+      if (applySharedUnoCall(room.uno, senderId)) {
         broadcastUnoState(room);
       }
       return;
