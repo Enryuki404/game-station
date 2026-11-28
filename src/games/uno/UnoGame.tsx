@@ -27,7 +27,14 @@ import {
   type UnoVariant,
 } from './unoEngine';
 import { LastOneCard, LastOneDrawDeck } from './LastOneCard';
-import { DirectionGlowRing, OpponentSeat, SeatAvatar, type TableOpponent } from './UnoTableParts';
+import {
+  DirectionGlowRing,
+  MoveHistoryChat,
+  OpponentSeat,
+  SeatAvatar,
+  type MoveLogEntry,
+  type TableOpponent,
+} from './UnoTableParts';
 
 interface UnoGameProps {
   onBack: () => void;
@@ -117,6 +124,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
   const [pendingSwapCard, setPendingSwapCard] = useState<UnoCard | null>(null);
   const [actionBurst, setActionBurst] = useState<{ id: number; text: string; tone: string } | null>(null);
   const [confettiKey, setConfettiKey] = useState(0);
+  const [moveLog, setMoveLog] = useState<MoveLogEntry[]>([]);
 
   // Online multiplayer state
   const [onlineSession, setOnlineSession] = useState<OnlineSession | null>(null);
@@ -137,6 +145,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
     (nextMode: 'ai' | 'online' = mode, nextAiCount: number = aiCount, nextVariant: UnoVariant = variant) => {
       rewardGrantedRef.current = false;
       setActionBurst(null);
+      setMoveLog([]);
       setPendingWildCard(null);
       setPendingSwapCard(null);
       setOnlineWildCard(null);
@@ -295,6 +304,15 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
   const statusText = isOnlinePlaying ? onlineUno!.statusText : match.statusText;
   const activeWildCard = isOnlinePlaying ? onlineWildCard : pendingWildCard;
   const activeSwapCard = isOnlinePlaying ? onlineSwapCard : pendingSwapCard;
+
+  useEffect(() => {
+    const trimmed = statusText.trim();
+    if (!trimmed) return;
+    setMoveLog((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].text === trimmed) return prev;
+      return [...prev.slice(-24), { id: Date.now() + Math.random(), text: trimmed }];
+    });
+  }, [statusText]);
 
   const isHumanTurn =
     (mode === 'online' ? isOnlinePlaying : true) &&
@@ -640,9 +658,9 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
         </div>
       ) : (
         <div className="uno-felt-table rounded-2xl sm:rounded-3xl border border-emerald-700/45 relative overflow-hidden min-h-[530px] sm:min-h-[600px] lg:min-h-[640px] flex flex-col justify-between p-3 sm:p-5">
-          {/* Subtle top corner HUD badges */}
-          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs">
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* Top-left compact HUD badges + Top-right Move History Chat */}
+          <div className="relative z-30 flex items-start justify-between gap-2 text-[11px] sm:text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 max-w-[calc(100%-13.5rem)] sm:max-w-[calc(100%-16rem)]">
               {activeVariant !== 'allwild' ? (
                 <span className={`px-2.5 py-1 rounded-full border backdrop-blur-sm font-semibold inline-flex items-center gap-1.5 ${COLOR_STYLES[activeColor].pill}`}>
                   <span className={`w-2 h-2 rounded-full ${COLOR_STYLES[activeColor].ring}`} />
@@ -653,25 +671,29 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                   All Wild
                 </span>
               )}
-              {activeVariant === 'nomercy' && (
-                <span className="px-2.5 py-1 rounded-full border border-amber-400/35 bg-black/45 text-amber-200 inline-flex items-center gap-1 font-semibold backdrop-blur-sm">
-                  <ShieldAlert className="w-3.5 h-3.5" /> Batas KO: 25
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="px-2.5 py-1 rounded-full border border-white/15 bg-black/45 text-emerald-50 font-mono-num font-semibold backdrop-blur-sm">
+                Dek: {drawCount}
+              </span>
+              <span className="px-2.5 py-1 rounded-full border border-white/15 bg-black/45 text-emerald-50 inline-flex items-center gap-1.5 font-medium backdrop-blur-sm">
+                <RotateCw className={`w-3.5 h-3.5 transition-transform duration-300 ${direction === -1 ? '-scale-x-100' : ''}`} />
+                <span className="hidden sm:inline">{direction === 1 ? 'Searah' : 'Berlawanan'}</span>
+              </span>
               {pendingDraw > 0 && (
                 <span className="px-2.5 py-1 rounded-full border border-rose-400/70 bg-rose-600/80 text-white inline-flex items-center gap-1 font-extrabold animate-pulse shadow-lg">
                   <Flame className="w-3.5 h-3.5 text-amber-200" />
                   Tumpukan +{pendingDraw}
                 </span>
               )}
-              <span className="px-2.5 py-1 rounded-full border border-white/15 bg-black/45 text-emerald-50 inline-flex items-center gap-1.5 font-medium backdrop-blur-sm">
-                <RotateCw className={`w-3.5 h-3.5 transition-transform duration-300 ${direction === -1 ? '-scale-x-100' : ''}`} />
-                <span className="hidden sm:inline">{direction === 1 ? 'Searah Jarum Jam' : 'Berlawanan Jarum Jam'}</span>
-              </span>
+              {activeVariant === 'nomercy' && (
+                <span className="px-2.5 py-1 rounded-full border border-amber-400/35 bg-black/45 text-amber-200 inline-flex items-center gap-1 font-semibold backdrop-blur-sm">
+                  <ShieldAlert className="w-3.5 h-3.5" /> Batas KO: 25
+                </span>
+              )}
             </div>
+          </div>
+
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-30">
+            <MoveHistoryChat entries={moveLog} />
           </div>
 
           {/* Mobile compact opponent bar (< md) */}
@@ -713,7 +735,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               )}
             </div>
 
-            <div className="relative flex flex-col items-center justify-center py-4 sm:py-6">
+            <div className="relative flex flex-col items-center justify-center py-6 sm:py-8">
               <DirectionGlowRing
                 activeColor={activeColor}
                 direction={direction}
@@ -736,9 +758,6 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                   <div key={topCard.id} className="relative animate-card-throw">
                     <LastOneCard card={topCard} size="md" className="rotate-[4deg]" />
                   </div>
-                  {activeVariant !== 'allwild' && (
-                    <div className={`absolute -bottom-2 -right-2 w-5 h-5 rounded-full border-2 border-white shadow-md transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
-                  )}
                 </div>
               </div>
 
@@ -750,10 +769,6 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                   {actionBurst.text}
                 </div>
               )}
-
-              <p className="relative z-10 mt-3 text-center text-[11px] sm:text-xs font-medium text-emerald-50/95 bg-black/45 border border-white/10 px-3.5 py-1 rounded-full backdrop-blur-sm max-w-md">
-                {statusText}
-              </p>
             </div>
 
             <div className="hidden md:flex justify-end items-center pr-1 lg:pr-3">

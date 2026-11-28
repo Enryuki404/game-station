@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 import type { UnoColor } from './unoEngine';
 import { LastOneCardBack } from './LastOneCard';
 
@@ -242,53 +243,120 @@ export const DirectionGlowRing: React.FC<{
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 flex items-center justify-center"
+      className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-45"
     >
       <svg
-        viewBox="0 0 420 220"
-        className={`w-[285px] sm:w-[390px] md:w-[440px] h-auto transition-transform duration-500 ${
+        viewBox="0 0 560 280"
+        className={`w-[320px] sm:w-[440px] md:w-[500px] h-auto transition-transform duration-500 ${
           direction === -1 ? '-scale-x-100' : 'scale-x-100'
         }`}
-        style={{ filter: `drop-shadow(0 0 12px ${palette.glow})` }}
+        style={{ filter: `drop-shadow(0 0 14px ${palette.glow})` }}
       >
         {/* Top clockwise sweeping arc */}
         <path
-          d="M 86 58 C 142 14, 266 14, 326 52"
+          d="M 92 96 C 165 16, 380 16, 452 76"
           fill="none"
           stroke={palette.stroke}
-          strokeWidth="12"
+          strokeWidth="16"
           strokeLinecap="round"
           opacity="0.22"
         />
         <path
-          d="M 86 58 C 142 14, 266 14, 326 52"
+          d="M 92 96 C 165 16, 380 16, 452 76"
           fill="none"
           stroke={palette.stroke}
-          strokeWidth="4.5"
+          strokeWidth="5"
           strokeLinecap="round"
-          opacity="0.92"
+          opacity="0.82"
         />
-        <path d="M 320 34 L 348 58 L 313 61 Z" fill={palette.stroke} opacity="0.95" />
+        <path d="M 446 56 L 482 92 L 436 86 Z" fill={palette.stroke} opacity="0.88" />
 
         {/* Bottom clockwise sweeping arc */}
         <path
-          d="M 334 162 C 278 206, 154 206, 94 168"
+          d="M 468 184 C 395 264, 180 264, 108 204"
           fill="none"
           stroke={palette.stroke}
-          strokeWidth="12"
+          strokeWidth="16"
           strokeLinecap="round"
           opacity="0.22"
         />
         <path
-          d="M 334 162 C 278 206, 154 206, 94 168"
+          d="M 468 184 C 395 264, 180 264, 108 204"
           fill="none"
           stroke={palette.stroke}
-          strokeWidth="4.5"
+          strokeWidth="5"
           strokeLinecap="round"
-          opacity="0.92"
+          opacity="0.82"
         />
-        <path d="M 100 186 L 72 162 L 107 159 Z" fill={palette.stroke} opacity="0.95" />
+        <path d="M 114 224 L 78 188 L 124 194 Z" fill={palette.stroke} opacity="0.88" />
       </svg>
+    </div>
+  );
+};
+
+export interface MoveLogEntry {
+  id: number;
+  text: string;
+}
+
+export const MoveHistoryChat: React.FC<{ entries: MoveLogEntry[] }> = ({ entries }) => {
+  const [expanded, setExpanded] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 640 : true
+  );
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (expanded && listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [entries.length, expanded]);
+
+  const latest = entries[entries.length - 1]?.text ?? 'Permainan dimulai.';
+
+  return (
+    <div className="w-52 sm:w-60 rounded-xl border border-white/12 bg-black/45 backdrop-blur-md shadow-lg text-left overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full px-2.5 py-1.5 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200/90 hover:bg-white/5 transition cursor-pointer"
+        aria-expanded={expanded}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <MessageSquare className="w-3 h-3 text-emerald-300" />
+          Riwayat ({entries.length})
+        </span>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5 text-white/60" /> : <ChevronDown className="w-3.5 h-3.5 text-white/60" />}
+      </button>
+
+      {expanded ? (
+        <div
+          ref={listRef}
+          className="max-h-[84px] overflow-y-auto no-scrollbar px-2.5 pb-2 space-y-1 border-t border-white/10 pt-1.5"
+        >
+          {entries.length === 0 ? (
+            <p className="text-[10.5px] text-white/70 leading-snug">Menunggu giliran pertama...</p>
+          ) : (
+            entries.map((entry, idx) => {
+              const isLatest = idx === entries.length - 1;
+              return (
+                <p
+                  key={entry.id}
+                  className={
+                    isLatest
+                      ? 'text-[11px] font-semibold text-white leading-snug'
+                      : 'text-[10px] text-white/55 leading-snug'
+                  }
+                >
+                  {entry.text}
+                </p>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        <p className="truncate text-[10.5px] text-white/85 px-2.5 pb-1.5">{latest}</p>
+      )}
     </div>
   );
 };

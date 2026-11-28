@@ -415,8 +415,9 @@ export const LastOneDrawDeck: React.FC<{
   canDraw: boolean;
   hasPlayableCard: boolean;
   pendingDraw?: number;
+  showLabel?: boolean;
   onDraw: () => void;
-}> = ({ drawCount, canDraw, hasPlayableCard, pendingDraw = 0, onDraw }) => {
+}> = ({ drawCount, canDraw, hasPlayableCard, pendingDraw = 0, showLabel = false, onDraw }) => {
   const mustDrawPenalty = canDraw && pendingDraw > 0 && !hasPlayableCard;
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -455,21 +456,23 @@ export const LastOneDrawDeck: React.FC<{
         </button>
       </div>
 
-      <span
-        className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold font-mono-num border ${
-          mustDrawPenalty
-            ? 'bg-rose-500 text-white border-rose-200'
-            : canDraw && !hasPlayableCard
-              ? 'bg-amber-400 text-slate-950 border-amber-200'
-              : 'bg-black/40 text-slate-200 border-white/15'
-        }`}
-      >
-        {canDraw && pendingDraw > 0
-          ? `Ambil +${pendingDraw}`
-          : canDraw
-            ? `Tap Dek (${drawCount})`
-            : `Dek (${drawCount})`}
-      </span>
+      {showLabel && (
+        <span
+          className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold font-mono-num border ${
+            mustDrawPenalty
+              ? 'bg-rose-500 text-white border-rose-200'
+              : canDraw && !hasPlayableCard
+                ? 'bg-amber-400 text-slate-950 border-amber-200'
+                : 'bg-black/40 text-slate-200 border-white/15'
+          }`}
+        >
+          {canDraw && pendingDraw > 0
+            ? `Ambil +${pendingDraw}`
+            : canDraw
+              ? `Tap Dek (${drawCount})`
+              : `Dek (${drawCount})`}
+        </span>
+      )}
     </div>
   );
 };
