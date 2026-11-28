@@ -6,7 +6,17 @@ const COLOR_LABELS = {
   yellow: 'Kuning',
 };
 
-const VALID_VARIANTS = new Set(['classic', 'stack', 'sevenzero', 'nomercy', 'allwild']);
+const VALID_VARIANTS = new Set(['classic', 'stack', 'sevenzero', 'nomercy', 'allwild', 'attack']);
+
+function rollLauncherBurst() {
+  const r = Math.random();
+  if (r < 0.4) return 0;
+  if (r < 0.65) return 2;
+  if (r < 0.83) return 3;
+  if (r < 0.93) return 4;
+  if (r < 0.98) return 6;
+  return 8;
+}
 
 function normalizeVariant(raw) {
   return typeof raw === 'string' && VALID_VARIANTS.has(raw) ? raw : 'classic';
@@ -60,7 +70,10 @@ export function createUnoDeck(variant = 'classic') {
 
   for (const color of UNO_COLORS) {
     deck.push({ id: `lo-${seq++}`, color, value: '0' });
-    const doubles = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
+    const doubles =
+      variant === 'attack'
+        ? ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'hit2', 'discardAll']
+        : ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
     for (const value of doubles) {
       deck.push({ id: `lo-${seq++}`, color, value });
       deck.push({ id: `lo-${seq++}`, color, value });
@@ -74,7 +87,12 @@ export function createUnoDeck(variant = 'classic') {
   }
   for (let i = 0; i < 4; i++) {
     deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild' });
-    deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild4' });
+    deck.push({ id: `lo-${seq++}`, color: 'wild', value: variant === 'attack' ? 'wildAllHit' : 'wild4' });
+  }
+  if (variant === 'attack') {
+    for (let i = 0; i < 2; i++) {
+      deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild4' });
+    }
   }
   if (variant === 'nomercy') {
     for (let i = 0; i < 4; i++) {
@@ -89,6 +107,7 @@ export function createUnoDeck(variant = 'classic') {
 
 export function isCardPlayable(card, topCard, activeColor, pendingDraw = 0, pendingDrawMin = 0, variant = 'classic') {
   if (!card || !topCard) return false;
+  if (pendingDraw > 0 && variant === 'attack') return false;
   if (pendingDraw > 0 && isStacking(variant)) {
     return getDrawPower(card.value) >= Math.max(2, pendingDrawMin);
   }
@@ -135,7 +154,9 @@ function formatUnoVal(val) {
   if (val === 'reverse') return 'Reverse';
   if (val === 'discardAll') return 'Buang Semua';
   if (val === 'draw2') return '+2';
+  if (val === 'hit2') return 'Hit 2';
   if (val === 'wild') return 'Wild';
+  if (val === 'wildAllHit') return 'Wild All Hit';
   if (val === 'wild4') return '+4 Wild';
   if (val === 'wild6') return '+6 Wild';
   if (val === 'wild10') return '+10 Wild';
@@ -146,8 +167,10 @@ function chooseBotCard(hand, topCard, activeColor, pendingDraw = 0, pendingDrawM
   const playable = hand.filter((c) => isCardPlayable(c, topCard, activeColor, pendingDraw, pendingDrawMin, variant));
   if (playable.length === 0) return null;
   const score = (c) => {
+    if (c.value === 'wildAllHit') return 58;
     if (c.value === 'discardAll') return 55;
     if (c.value === 'skipAll') return 48;
+    if (c.value === 'hit2') return 44;
     if (c.value === 'wild10') return pendingDraw > 0 ? 60 : 42;
     if (c.value === 'wild6') return pendingDraw > 0 ? 52 : 38;
     if (c.value === 'draw2') return 40;
@@ -233,7 +256,7 @@ export function startUnoMatch(room, fillBots, variantRaw = 'classic') {
       : deck.findIndex(
           (c) =>
             c.color !== 'wild' &&
-            !['draw2', 'skip', 'reverse', 'skipAll', 'discardAll'].includes(c.value)
+            !['draw2', 'hit2', 'skip', 'reverse', 'skipAll', 'discardAll'].includes(c.value)
         );
   if (firstIdx === -1) firstIdx = 0;
   const [firstCard] = deck.splice(firstIdx, 1);
@@ -251,6 +274,7 @@ export function startUnoMatch(room, fillBots, variantRaw = 'classic') {
     pendingDrawMin: 0,
     winnerIndex: null,
     lastBurst: null,
+    lastLauncherEvent: null,
     statusText: `Permainan dimulai! Giliran ${players[0].name}.`,
   };
 }
@@ -312,6 +336,7 @@ export function applyUnoPlay(room, actorId, cardId, chosenColor, swapTargetId) {
   let step = 1;
   let effectNote = '';
   u.lastBurst = null;
+  u.lastLauncherEvent = null;
 
   if (isSevenZero(u.variant) && card.value === '7') {
     const aliveOpps = u.players.filter((p, idx) => idx !== actorIdx && !p.eliminated);
@@ -364,10 +389,46 @@ export function applyUnoPlay(room, actorId, cardId, chosenColor, swapTargetId) {
     step = 2;
     effectNote = ` — ${skipped.name} dilewati!`;
     u.lastBurst = { id: Date.now(), text: 'SKIP!' };
+  } else if (card.value === 'hit2') {
+    u.pendingDraw = 2;
+    u.pendingDrawMin = 0;
+    step = 1;
+    effectNote = ' — Wajib tekan Launcher 2×!';
+    u.lastBurst = { id: Date.now(), text: 'HIT 2× LAUNCHER!' };
+  } else if (card.value === 'wildAllHit') {
+    let totalShot = 0;
+    for (let idx = 0; idx < u.players.length; idx++) {
+      if (idx === actorIdx || u.players[idx].eliminated) continue;
+      const burst = rollLauncherBurst();
+      if (burst > 0) {
+        const res = drawFromPile(u.drawPile, u.discardPile, burst);
+        u.players[idx].hand.push(...res.drawn);
+        u.players[idx].saidUno = false;
+        u.drawPile = res.nextDraw;
+        u.discardPile = res.nextDiscard;
+        totalShot += res.drawn.length;
+      }
+    }
+    u.lastLauncherEvent = { id: Date.now(), cards: totalShot, actorName: 'Semua Lawan' };
+    step = 1;
+    effectNote =
+      totalShot > 0
+        ? ` — Semua lawan ditembak Launcher (total +${totalShot} kartu)!`
+        : ' — Semua lawan lolos (0 kartu)!';
+    u.lastBurst = {
+      id: Date.now(),
+      text: totalShot > 0 ? `ALL HIT! +${totalShot} KARTU!` : 'ALL HIT! SEMUA AMAN!',
+    };
   } else {
     const drawPower = getDrawPower(card.value);
     if (drawPower > 0) {
-      if (isStacking(u.variant)) {
+      if (u.variant === 'attack') {
+        u.pendingDraw = drawPower;
+        u.pendingDrawMin = 0;
+        step = 1;
+        effectNote = ` — Wajib tekan Launcher ${drawPower}×!`;
+        u.lastBurst = { id: Date.now(), text: `EXTREME ${drawPower}× LAUNCHER!` };
+      } else if (isStacking(u.variant)) {
         u.pendingDraw += drawPower;
         u.pendingDrawMin = Math.max(u.pendingDrawMin, drawPower);
         step = 1;
@@ -405,6 +466,40 @@ export function applyUnoDraw(room, actorId) {
   const actorIdx = u.currentTurn;
   const actor = u.players[actorIdx];
   if (!actor || actor.id !== actorId || actor.eliminated) return false;
+
+  if (u.variant === 'attack') {
+    const burst = rollLauncherBurst();
+    let pulled = 0;
+    if (burst > 0) {
+      const res = drawFromPile(u.drawPile, u.discardPile, burst);
+      actor.hand.push(...res.drawn);
+      actor.saidUno = false;
+      u.drawPile = res.nextDraw;
+      u.discardPile = res.nextDiscard;
+      pulled = res.drawn.length;
+    }
+
+    u.lastLauncherEvent = { id: Date.now(), cards: pulled, actorName: actor.name };
+    const hitNote = pulled > 0 ? `DUAR! +${pulled} kartu` : 'KLIK! Aman (0 kartu)';
+
+    if (u.pendingDraw > 0) {
+      u.pendingDraw -= 1;
+      if (u.pendingDraw > 0) {
+        u.lastBurst = { id: Date.now(), text: `${hitNote} • Sisa ${u.pendingDraw}×!` };
+        u.statusText = `${actor.name} tekan Launcher → ${hitNote}! (Sisa wajib tekan ${u.pendingDraw}× lagi)`;
+        return true;
+      }
+      u.lastBurst = { id: Date.now(), text: pulled > 0 ? `DUAR! +${pulled}!` : 'KLIK! AMAN!' };
+      u.currentTurn = nextAliveIndex(u.players, actorIdx, u.direction, 1);
+      u.statusText = `${actor.name} tekan Launcher → ${hitNote}! Giliran ${u.players[u.currentTurn].name}.`;
+      return true;
+    }
+
+    u.lastBurst = { id: Date.now(), text: pulled > 0 ? `DUAR! +${pulled}!` : 'KLIK! AMAN!' };
+    u.currentTurn = nextAliveIndex(u.players, actorIdx, u.direction, 1);
+    u.statusText = `${actor.name} tekan Launcher → ${hitNote}! Giliran ${u.players[u.currentTurn].name}.`;
+    return true;
+  }
 
   if (u.pendingDraw > 0) {
     const amount = u.pendingDraw;
@@ -535,6 +630,7 @@ export function getSanitizedUnoState(room, viewerId) {
     pendingDrawMin: u.pendingDrawMin,
     winnerIndex: u.winnerIndex,
     lastBurst: u.lastBurst,
+    lastLauncherEvent: u.lastLauncherEvent ?? null,
     statusText: u.statusText,
   };
 }

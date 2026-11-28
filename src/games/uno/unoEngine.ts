@@ -21,9 +21,11 @@ export type UnoValue =
   | 'wild6'
   | 'wild10'
   | 'skipAll'
-  | 'discardAll';
+  | 'discardAll'
+  | 'hit2'
+  | 'wildAllHit';
 
-export type UnoVariant = 'classic' | 'stack' | 'sevenzero' | 'nomercy' | 'allwild';
+export type UnoVariant = 'classic' | 'stack' | 'sevenzero' | 'nomercy' | 'allwild' | 'attack';
 
 export interface UnoCard {
   id: string;
@@ -64,6 +66,7 @@ export interface SharedUnoMatch {
   pendingDrawMin: number;
   winnerIndex: number | null;
   lastBurst: { id: number; text: string } | null;
+  lastLauncherEvent?: { id: number; cards: number; actorName: string } | null;
   statusText: string;
 }
 
@@ -122,7 +125,27 @@ export const UNO_VARIANT_META: Record<UnoVariant, { label: string; shortDesc: st
       'Berisi Wild Biasa, Wild Skip, Wild Reverse, Wild +2, Wild +4, dan Wild Skip All.',
     ],
   },
+  attack: {
+    label: 'Attack!',
+    shortDesc: 'Mesin Card Launcher! Tekan tombol launcher: bisa aman (0 kartu) atau meledak 2–8 kartu sekaligus!',
+    rules: [
+      'Dek diganti menjadi Mesin Card Launcher! Saat menekan tombol Launcher, hasilnya acak: bisa klik AMAN (0 kartu) atau menyemburkan 2–8 kartu sekaligus!',
+      'Hit 2 (⚡2): Pemain berikutnya wajib menekan tombol Launcher 2× berturut-turut!',
+      'Wild All Hit (⚡ALL): Pilih warna — SEMUA lawan di meja otomatis ditembak Launcher 1×!',
+      'Wild +4 (⚡4): Pilih warna dan pemain berikutnya wajib menekan tombol Launcher 4×! Tersedia juga Discard All.',
+    ],
+  },
 };
+
+export function rollLauncherBurst(): number {
+  const r = Math.random();
+  if (r < 0.4) return 0;
+  if (r < 0.65) return 2;
+  if (r < 0.83) return 3;
+  if (r < 0.93) return 4;
+  if (r < 0.98) return 6;
+  return 8;
+}
 
 export function getDrawPower(value: UnoValue): number {
   if (value === 'draw2') return 2;
@@ -163,7 +186,10 @@ export function createUnoDeck(variant: UnoVariant = 'classic'): UnoCard[] {
 
   for (const color of UNO_COLORS) {
     deck.push({ id: `lo-${seq++}`, color, value: '0' });
-    const doubles: UnoValue[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
+    const doubles: UnoValue[] =
+      variant === 'attack'
+        ? ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'hit2', 'discardAll']
+        : ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
     for (const value of doubles) {
       deck.push({ id: `lo-${seq++}`, color, value });
       deck.push({ id: `lo-${seq++}`, color, value });
@@ -178,7 +204,17 @@ export function createUnoDeck(variant: UnoVariant = 'classic'): UnoCard[] {
 
   for (let i = 0; i < 4; i++) {
     deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild' });
-    deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild4' });
+    if (variant === 'attack') {
+      deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wildAllHit' });
+    } else {
+      deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild4' });
+    }
+  }
+
+  if (variant === 'attack') {
+    for (let i = 0; i < 2; i++) {
+      deck.push({ id: `lo-${seq++}`, color: 'wild', value: 'wild4' });
+    }
   }
 
   if (variant === 'nomercy') {
@@ -201,6 +237,9 @@ export function isCardPlayable(
   pendingDrawMin = 0,
   variant: UnoVariant = 'classic'
 ): boolean {
+  if (pendingDraw > 0 && variant === 'attack') {
+    return false;
+  }
   if (pendingDraw > 0 && isStackingVariant(variant)) {
     return getDrawPower(card.value) >= Math.max(2, pendingDrawMin);
   }
@@ -225,8 +264,10 @@ export function chooseBestAiCard(
   if (playable.length === 0) return null;
 
   const score = (c: UnoCard): number => {
+    if (c.value === 'wildAllHit') return 58;
     if (c.value === 'discardAll') return 55;
     if (c.value === 'skipAll') return 48;
+    if (c.value === 'hit2') return 44;
     if (c.value === 'wild10') return pendingDraw > 0 ? 60 : 42;
     if (c.value === 'wild6') return pendingDraw > 0 ? 52 : 38;
     if (c.value === 'draw2') return 40;
@@ -262,8 +303,12 @@ export function formatUnoValue(value: UnoValue): string {
       return 'Buang Semua';
     case 'draw2':
       return '+2';
+    case 'hit2':
+      return 'Hit 2';
     case 'wild':
       return 'Wild';
+    case 'wildAllHit':
+      return 'Wild All Hit';
     case 'wild4':
       return '+4 Wild';
     case 'wild6':
@@ -371,7 +416,7 @@ export function createSharedUnoMatch(
       : deck.findIndex(
           (c) =>
             c.color !== 'wild' &&
-            !['draw2', 'skip', 'reverse', 'skipAll', 'discardAll'].includes(c.value)
+            !['draw2', 'hit2', 'skip', 'reverse', 'skipAll', 'discardAll'].includes(c.value)
         );
   if (firstIdx === -1) firstIdx = 0;
   const [firstCard] = deck.splice(firstIdx, 1);
@@ -389,6 +434,7 @@ export function createSharedUnoMatch(
     pendingDrawMin: 0,
     winnerIndex: null,
     lastBurst: null,
+    lastLauncherEvent: null,
     statusText: `Mode ${UNO_VARIANT_META[variant].label} dimulai! Giliran ${players[0].name}.`,
   };
 }
@@ -469,6 +515,7 @@ export function applySharedUnoPlay(
   let step = 1;
   let effectNote = '';
   match.lastBurst = null;
+  match.lastLauncherEvent = null;
 
   // 7-0 Chaos & No Mercy: 7 Swaps with chosen opponent, 0 Rotates all alive hands
   if (isSevenZeroVariant(match.variant) && card.value === '7') {
@@ -520,10 +567,46 @@ export function applySharedUnoPlay(
     step = 2;
     effectNote = ` — ${skipped.name} dilewati!`;
     match.lastBurst = { id: Date.now(), text: 'SKIP!' };
+  } else if (card.value === 'hit2') {
+    match.pendingDraw = 2;
+    match.pendingDrawMin = 0;
+    step = 1;
+    effectNote = ' — Wajib tekan Launcher 2×!';
+    match.lastBurst = { id: Date.now(), text: 'HIT 2× LAUNCHER!' };
+  } else if (card.value === 'wildAllHit') {
+    let totalShot = 0;
+    for (let idx = 0; idx < match.players.length; idx++) {
+      if (idx === actorIdx || match.players[idx].eliminated) continue;
+      const burst = rollLauncherBurst();
+      if (burst > 0) {
+        const res = drawFromMatchPile(match.drawPile, match.discardPile, burst);
+        match.players[idx].hand.push(...res.drawn);
+        match.players[idx].saidUno = false;
+        match.drawPile = res.nextDraw;
+        match.discardPile = res.nextDiscard;
+        totalShot += res.drawn.length;
+      }
+    }
+    match.lastLauncherEvent = { id: Date.now(), cards: totalShot, actorName: 'Semua Lawan' };
+    step = 1;
+    effectNote =
+      totalShot > 0
+        ? ` — Semua lawan ditembak Launcher (total +${totalShot} kartu)!`
+        : ' — Semua lawan lolos (0 kartu)!';
+    match.lastBurst = {
+      id: Date.now(),
+      text: totalShot > 0 ? `ALL HIT! +${totalShot} KARTU!` : 'ALL HIT! SEMUA AMAN!',
+    };
   } else {
     const drawPower = getDrawPower(card.value);
     if (drawPower > 0) {
-      if (isStackingVariant(match.variant)) {
+      if (match.variant === 'attack') {
+        match.pendingDraw = drawPower;
+        match.pendingDrawMin = 0;
+        step = 1;
+        effectNote = ` — Wajib tekan Launcher ${drawPower}×!`;
+        match.lastBurst = { id: Date.now(), text: `EXTREME ${drawPower}× LAUNCHER!` };
+      } else if (isStackingVariant(match.variant)) {
         match.pendingDraw += drawPower;
         match.pendingDrawMin = Math.max(match.pendingDrawMin, drawPower);
         step = 1;
@@ -563,6 +646,41 @@ export function applySharedUnoDraw(match: SharedUnoMatch, actorId: string): bool
   const actorIdx = match.currentTurn;
   const actor = match.players[actorIdx];
   if (!actor || actor.id !== actorId || actor.eliminated) return false;
+
+  // Attack! Mode: trigger Card Launcher (0 safe click or 2-8 card burst)
+  if (match.variant === 'attack') {
+    const burst = rollLauncherBurst();
+    let pulled = 0;
+    if (burst > 0) {
+      const res = drawFromMatchPile(match.drawPile, match.discardPile, burst);
+      actor.hand.push(...res.drawn);
+      actor.saidUno = false;
+      match.drawPile = res.nextDraw;
+      match.discardPile = res.nextDiscard;
+      pulled = res.drawn.length;
+    }
+
+    match.lastLauncherEvent = { id: Date.now(), cards: pulled, actorName: actor.name };
+    const hitNote = pulled > 0 ? `DUAR! +${pulled} kartu` : 'KLIK! Aman (0 kartu)';
+
+    if (match.pendingDraw > 0) {
+      match.pendingDraw -= 1;
+      if (match.pendingDraw > 0) {
+        match.lastBurst = { id: Date.now(), text: `${hitNote} • Sisa ${match.pendingDraw}×!` };
+        match.statusText = `${actor.name} tekan Launcher → ${hitNote}! (Sisa wajib tekan ${match.pendingDraw}× lagi)`;
+        return true;
+      }
+      match.lastBurst = { id: Date.now(), text: pulled > 0 ? `DUAR! +${pulled}!` : 'KLIK! AMAN!' };
+      match.currentTurn = nextAliveIndex(match.players, actorIdx, match.direction, 1);
+      match.statusText = `${actor.name} tekan Launcher → ${hitNote}! Giliran ${match.players[match.currentTurn].name}.`;
+      return true;
+    }
+
+    match.lastBurst = { id: Date.now(), text: pulled > 0 ? `DUAR! +${pulled}!` : 'KLIK! AMAN!' };
+    match.currentTurn = nextAliveIndex(match.players, actorIdx, match.direction, 1);
+    match.statusText = `${actor.name} tekan Launcher → ${hitNote}! Giliran ${match.players[match.currentTurn].name}.`;
+    return true;
+  }
 
   // Taking accumulated stack penalty
   if (match.pendingDraw > 0) {
@@ -668,6 +786,7 @@ export function getSanitizedSharedUnoState(match: SharedUnoMatch, viewerId: stri
     pendingDrawMin: match.pendingDrawMin,
     winnerIndex: match.winnerIndex,
     lastBurst: match.lastBurst,
+    lastLauncherEvent: match.lastLauncherEvent ?? null,
     statusText: match.statusText,
   };
 }

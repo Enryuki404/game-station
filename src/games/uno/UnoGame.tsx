@@ -26,7 +26,7 @@ import {
   type UnoColor,
   type UnoVariant,
 } from './unoEngine';
-import { LastOneCard, LastOneDrawDeck } from './LastOneCard';
+import { LastOneCard, LastOneDrawDeck, LastOneLauncher } from './LastOneCard';
 import {
   MoveHistoryChat,
   OpponentSeat,
@@ -66,6 +66,7 @@ interface OnlineUnoState {
   pendingDrawMin: number;
   winnerIndex: number | null;
   lastBurst: { id: number; text: string } | null;
+  lastLauncherEvent?: { id: number; cards: number; actorName: string } | null;
   statusText: string;
 }
 
@@ -92,7 +93,7 @@ const COLOR_STYLES: Record<UnoColor, { bg: string; ring: string; pill: string }>
   },
 };
 
-const ALL_VARIANTS: UnoVariant[] = ['classic', 'stack', 'sevenzero', 'nomercy', 'allwild'];
+const ALL_VARIANTS: UnoVariant[] = ['classic', 'stack', 'sevenzero', 'nomercy', 'allwild', 'attack'];
 
 function createOfflineMatch(aiCount: number, variant: UnoVariant): SharedUnoMatch {
   const botNames = ['Bot Raka', 'Bot Sinta', 'Bot Budi', 'Bot Dewi', 'Bot Dimas'];
@@ -136,6 +137,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
 
   const rewardGrantedRef = useRef(false);
   const lastBurstIdRef = useRef<number | null>(null);
+  const lastLauncherIdRef = useRef<number | null>(null);
 
   const triggerBurst = useCallback((text: string, tone = 'bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950') => {
     setActionBurst({ id: Date.now() + Math.random(), text, tone });
@@ -304,6 +306,15 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
   const statusText = isOnlinePlaying ? onlineUno!.statusText : match.statusText;
   const activeWildCard = isOnlinePlaying ? onlineWildCard : pendingWildCard;
   const activeSwapCard = isOnlinePlaying ? onlineSwapCard : pendingSwapCard;
+  const lastLauncherEvent = isOnlinePlaying ? (onlineUno!.lastLauncherEvent ?? null) : (match.lastLauncherEvent ?? null);
+
+  useEffect(() => {
+    if (!lastLauncherEvent) return;
+    if (lastLauncherEvent.id !== lastLauncherIdRef.current) {
+      lastLauncherIdRef.current = lastLauncherEvent.id;
+      sfx(lastLauncherEvent.cards > 0 ? 'launcherFire' : 'launcherSafe');
+    }
+  }, [lastLauncherEvent, sfx]);
 
   useEffect(() => {
     const trimmed = statusText.trim();
@@ -681,7 +692,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               {pendingDraw > 0 && (
                 <span className="px-2.5 py-1 rounded-full border border-rose-400/70 bg-rose-600/80 text-white inline-flex items-center gap-1 font-extrabold animate-pulse shadow-lg">
                   <Flame className="w-3.5 h-3.5 text-amber-200" />
-                  Tumpukan +{pendingDraw}
+                  {activeVariant === 'attack' ? `Wajib Tekan ${pendingDraw}×` : `Tumpukan +${pendingDraw}`}
                 </span>
               )}
               {activeVariant === 'nomercy' && (
@@ -743,13 +754,23 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
               <TableFeltWatermark />
 
               <div className="relative z-10 flex items-center justify-center gap-6 sm:gap-10">
-                <LastOneDrawDeck
-                  drawCount={drawCount}
-                  canDraw={isHumanTurn}
-                  hasPlayableCard={hasPlayableCard}
-                  pendingDraw={pendingDraw}
-                  onDraw={handleDrawClick}
-                />
+                {activeVariant === 'attack' ? (
+                  <LastOneLauncher
+                    canFire={isHumanTurn}
+                    hasPlayableCard={hasPlayableCard}
+                    pendingHits={pendingDraw}
+                    launcherEvent={lastLauncherEvent}
+                    onFire={handleDrawClick}
+                  />
+                ) : (
+                  <LastOneDrawDeck
+                    drawCount={drawCount}
+                    canDraw={isHumanTurn}
+                    hasPlayableCard={hasPlayableCard}
+                    pendingDraw={pendingDraw}
+                    onDraw={handleDrawClick}
+                  />
+                )}
 
                 <div className="relative">
                   {activeVariant !== 'allwild' && (

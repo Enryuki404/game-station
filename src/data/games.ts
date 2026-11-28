@@ -6,9 +6,9 @@ export const GAMES: GameMeta[] = [
     title: 'LAST ONE!',
     subtitle: 'Pesta Kartu 2–6 Pemain',
     category: 'card',
-    modes: ['Online 2–6P', '5 Mode Seru', 'vs 1–5 AI'],
+    modes: ['Online 2–6P', '6 Mode Seru', 'vs 1–5 AI'],
     description:
-      'Pilih mode Classic, Stack +2/+4, 7-0 Chaos, No Mercy, atau All Wild — lalu teriak LAST ONE! saat kartu tersisa satu.',
+      'Pilih mode Classic, Stack +2/+4, 7-0 Chaos, No Mercy, All Wild, atau Attack! Card Launcher — lalu teriak LAST ONE!',
     accentFrom: 'from-rose-500',
     accentTo: 'to-amber-500',
     badgeColor: 'bg-rose-500/15 text-rose-300 border-rose-500/30',

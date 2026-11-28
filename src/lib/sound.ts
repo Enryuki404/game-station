@@ -10,7 +10,9 @@ export type SfxType =
   | 'uno'
   | 'win'
   | 'lose'
-  | 'foul';
+  | 'foul'
+  | 'launcherSafe'
+  | 'launcherFire';
 
 let audioCtx: AudioContext | null = null;
 const lastPlayedAt: Partial<Record<SfxType, number>> = {};
@@ -179,6 +181,17 @@ export function playSfx(type: SfxType, enabled = true): void {
       case 'foul':
         playTone(ctx, 220, 140, 0.16, 'sawtooth', 0.065, 0);
         playTone(ctx, 180, 110, 0.2, 'sawtooth', 0.065, 0.12);
+        break;
+      case 'launcherSafe':
+        playTone(ctx, 980, 620, 0.035, 'square', 0.055);
+        playTone(ctx, 740, 880, 0.07, 'sine', 0.06, 0.04);
+        break;
+      case 'launcherFire':
+        playTone(ctx, 180, 72, 0.14, 'sawtooth', 0.11);
+        playCardSwoosh(ctx);
+        playTone(ctx, 420, 680, 0.045, 'square', 0.05, 0.02);
+        playTone(ctx, 520, 820, 0.045, 'square', 0.05, 0.07);
+        playTone(ctx, 640, 960, 0.05, 'triangle', 0.065, 0.12);
         break;
     }
   } catch {

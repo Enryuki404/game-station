@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Zap } from 'lucide-react';
 import type { UnoCard, UnoColor, UnoValue } from './unoEngine';
 
 const CARD_PALETTES: Record<UnoColor | 'wild', { grad: string; corner: string }> = {
@@ -36,8 +37,12 @@ function cornerLabel(val: UnoValue): string {
       return 'ALL';
     case 'draw2':
       return '+2';
+    case 'hit2':
+      return '⚡2';
     case 'wild':
       return 'W';
+    case 'wildAllHit':
+      return '⚡ALL';
     case 'wild4':
       return '+4';
     case 'wild6':
@@ -165,6 +170,41 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
           +2
         </text>
       </svg>
+    );
+  }
+
+  if (card.value === 'hit2') {
+    return (
+      <div className="flex flex-col items-center justify-center leading-none gap-0.5">
+        <Zap
+          className={`w-5 h-5 sm:w-6 sm:h-6 drop-shadow-md ${
+            isYellow ? 'text-slate-950 fill-slate-950' : 'text-amber-300 fill-amber-300'
+          }`}
+          aria-hidden="true"
+        />
+        <span
+          className={`font-black text-xs sm:text-sm tracking-tight ${
+            isYellow ? 'text-slate-950' : 'text-white'
+          }`}
+        >
+          HIT 2
+        </span>
+      </div>
+    );
+  }
+
+  if (card.value === 'wildAllHit') {
+    return (
+      <div className="flex flex-col items-center justify-center leading-none gap-1">
+        <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 fill-amber-400 drop-shadow-[0_2px_6px_rgba(251,191,36,0.65)]" aria-hidden="true" />
+        <span className="font-black text-[9px] sm:text-[10px] tracking-wider text-white uppercase">ALL HIT</span>
+        <div className="flex gap-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        </div>
+      </div>
     );
   }
 
@@ -473,6 +513,86 @@ export const LastOneDrawDeck: React.FC<{
               : `Dek (${drawCount})`}
         </span>
       )}
+    </div>
+  );
+};
+
+export const LastOneLauncher: React.FC<{
+  canFire: boolean;
+  hasPlayableCard: boolean;
+  pendingHits?: number;
+  launcherEvent?: { id: number; cards: number; actorName: string } | null;
+  onFire: () => void;
+}> = ({ canFire, hasPlayableCard, pendingHits = 0, launcherEvent, onFire }) => {
+  const [flashState, setFlashState] = useState<'idle' | 'safe' | 'fire'>('idle');
+  const mustFire = canFire && pendingHits > 0;
+
+  useEffect(() => {
+    if (!launcherEvent) return;
+    setFlashState(launcherEvent.cards > 0 ? 'fire' : 'safe');
+    const timer = window.setTimeout(() => setFlashState('idle'), 450);
+    return () => window.clearTimeout(timer);
+  }, [launcherEvent?.id, launcherEvent?.cards]);
+
+  const statusLed =
+    flashState === 'fire'
+      ? 'bg-rose-400 shadow-[0_0_12px_rgba(251,113,133,0.95)]'
+      : flashState === 'safe'
+        ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.95)]'
+        : mustFire
+          ? 'bg-rose-400 animate-ping'
+          : canFire
+            ? 'bg-amber-400 animate-pulse'
+            : 'bg-slate-600';
+
+  const frameAnim =
+    flashState === 'fire'
+      ? 'animate-launcher-shake ring-2 ring-rose-400 shadow-[0_0_28px_rgba(244,63,94,0.65)]'
+      : flashState === 'safe'
+        ? 'animate-launcher-click ring-2 ring-emerald-400 shadow-[0_0_22px_rgba(16,185,129,0.5)]'
+        : mustFire
+          ? 'ring-2 ring-rose-400 shadow-[0_0_24px_rgba(244,63,94,0.5)]'
+          : canFire && !hasPlayableCard
+            ? 'ring-2 ring-amber-400 shadow-[0_0_22px_rgba(251,191,36,0.45)]'
+            : '';
+
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        className={`w-[88px] sm:w-[104px] rounded-2xl border-2 border-slate-300/30 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-2 shadow-2xl flex flex-col items-center gap-2 transition-all duration-200 ${frameAnim}`}
+      >
+        {/* Top Launcher Chute with peeking card back */}
+        <div className="relative w-full h-11 sm:h-12 rounded-lg bg-black/75 border border-white/10 overflow-hidden flex items-start justify-center pt-1.5 shadow-inner">
+          <div className="scale-[0.72] origin-top -mt-1 pointer-events-none">
+            <LastOneCardBack size="sm" />
+          </div>
+          <span
+            aria-hidden="true"
+            className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${statusLed}`}
+          />
+        </div>
+
+        {/* Single Tactile Card Launcher Trigger Button */}
+        <button
+          type="button"
+          disabled={!canFire}
+          onClick={onFire}
+          aria-label="Tekan tombol Card Launcher"
+          title={canFire ? 'Tekan tombol Launcher untuk menembak dek acak!' : 'Tunggu giliranmu'}
+          className={`w-full py-2 sm:py-2.5 px-1.5 rounded-xl border font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-1 transition-all duration-150 btn-tactile ${
+            canFire
+              ? mustFire
+                ? 'bg-gradient-to-b from-rose-500 to-red-700 border-rose-200/80 text-white shadow-lg animate-pulse-glow cursor-pointer hover:brightness-110'
+                : !hasPlayableCard
+                  ? 'bg-gradient-to-b from-amber-400 to-orange-600 border-amber-100/80 text-slate-950 shadow-lg animate-pulse-glow cursor-pointer hover:brightness-105'
+                  : 'bg-gradient-to-b from-emerald-400 to-teal-600 border-emerald-100/70 text-slate-950 shadow-md cursor-pointer hover:brightness-105'
+              : 'bg-slate-800/80 border-slate-700 text-slate-500 cursor-not-allowed'
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5 fill-current shrink-0" />
+          <span>{mustFire ? `TEKAN ${pendingHits}×` : canFire ? 'TEKAN!' : 'LAUNCHER'}</span>
+        </button>
+      </div>
     </div>
   );
 };

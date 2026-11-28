@@ -148,8 +148,8 @@ function broadcastEvent(room: HostRoomState, event: string, payload?: any, exclu
   }
 }
 
-// ---- Host Authoritative LAST ONE! Engine (2-6 Players, 5 Variants) ----
-const VALID_UNO_VARIANTS = new Set<UnoVariant>(['classic', 'stack', 'sevenzero', 'nomercy', 'allwild']);
+// ---- Host Authoritative LAST ONE! Engine (2-6 Players, 6 Variants) ----
+const VALID_UNO_VARIANTS = new Set<UnoVariant>(['classic', 'stack', 'sevenzero', 'nomercy', 'allwild', 'attack']);
 
 function normalizeUnoVariant(raw: unknown): UnoVariant {
   return typeof raw === 'string' && VALID_UNO_VARIANTS.has(raw as UnoVariant) ? (raw as UnoVariant) : 'classic';
