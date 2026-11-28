@@ -579,7 +579,7 @@ export const LastOneLauncher: React.FC<{
           onClick={onFire}
           aria-label="Tekan tombol Card Launcher"
           title={canFire ? 'Tekan tombol Launcher untuk menembak dek acak!' : 'Tunggu giliranmu'}
-          className={`w-full py-2 sm:py-2.5 px-1.5 rounded-xl border font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-1 transition-all duration-150 btn-tactile ${
+          className={`w-full py-2 sm:py-2.5 px-1.5 rounded-xl border font-black text-[9.5px] sm:text-[10.5px] uppercase tracking-tight whitespace-nowrap flex items-center justify-center gap-1 transition-all duration-150 btn-tactile ${
             canFire
               ? mustFire
                 ? 'bg-gradient-to-b from-rose-500 to-red-700 border-rose-200/80 text-white shadow-lg animate-pulse-glow cursor-pointer hover:brightness-110'
@@ -589,8 +589,8 @@ export const LastOneLauncher: React.FC<{
               : 'bg-slate-800/80 border-slate-700 text-slate-500 cursor-not-allowed'
           }`}
         >
-          <LastOneEmblem className="w-4 h-4 shrink-0" />
-          <span>{mustFire ? `TEKAN ${pendingHits}×` : canFire ? 'TEKAN!' : 'LAUNCHER'}</span>
+          <LastOneEmblem className="w-3.5 h-3.5 shrink-0" />
+          <span>{mustFire ? `HIT ${pendingHits}×` : canFire ? 'TEKAN!' : 'TEKAN'}</span>
         </button>
       </div>
     </div>
