@@ -316,17 +316,19 @@ export const LastOneDrawDeck: React.FC<{
 }> = ({ drawCount, canDraw, hasPlayableCard, onDraw }) => {
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <div className="relative pt-1 pr-1.5">
-        {/* Stacked card depth layers */}
+      <div className="relative pt-1.5 pr-2">
+        {/* Stacked opaque card-edge layers (no inner logo to prevent bleed-through) */}
         {drawCount > 2 && (
-          <div className="pointer-events-none absolute top-0 left-1.5 translate-x-1.5 -translate-y-1 opacity-70">
-            <LastOneCardBack size="md" />
-          </div>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1.5 left-0 translate-x-2 -translate-y-1.5 w-16 h-[92px] sm:w-[76px] sm:h-[108px] rounded-lg border-2 border-white/60 bg-slate-950 shadow-md"
+          />
         )}
         {drawCount > 1 && (
-          <div className="pointer-events-none absolute top-0.5 left-0.5 translate-x-1 -translate-y-0.5 opacity-85">
-            <LastOneCardBack size="md" />
-          </div>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1.5 left-0 translate-x-1 -translate-y-0.5 w-16 h-[92px] sm:w-[76px] sm:h-[108px] rounded-lg border-2 border-white/75 bg-slate-900 shadow-md"
+          />
         )}
 
         <button
@@ -340,7 +342,7 @@ export const LastOneDrawDeck: React.FC<{
               ? !hasPlayableCard
                 ? 'cursor-pointer hover:-translate-y-1.5 hover:scale-[1.04] ring-2 ring-amber-400 shadow-[0_0_24px_rgba(251,191,36,0.45)] animate-pulse-glow'
                 : 'cursor-pointer hover:-translate-y-1.5 hover:scale-[1.04] ring-2 ring-emerald-300/70 hover:ring-amber-300 shadow-[0_0_18px_rgba(16,185,129,0.3)]'
-              : 'opacity-65 cursor-not-allowed'
+              : 'brightness-75 saturate-75 cursor-not-allowed'
           }`}
         >
           <LastOneCardBack size="md" />
