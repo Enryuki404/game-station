@@ -38,6 +38,8 @@ import {
   getCarromSide,
   getCarromTeam,
   isStrikerPositionValid,
+  POCKET_OFFSET,
+  POCKET_RADIUS,
   raycastCarromAim,
   STRIKER_RADIUS,
   type CarromSide,
@@ -426,15 +428,116 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
       ctx.stroke();
     }
 
-    // Pockets
-    for (const p of CARROM_POCKETS) {
-      ctx.fillStyle = '#0f172a';
+    // Corner-merged 3D conical funnel pockets ("kerucut")
+    const c = POCKET_OFFSET;
+    const r = POCKET_RADIUS;
+    const jaw = c + r + 5;
+    const corners = [
+      { cx: CARROM_BORDER, cy: CARROM_BORDER, sx: 1, sy: 1 },
+      { cx: CARROM_SIZE - CARROM_BORDER, cy: CARROM_BORDER, sx: -1, sy: 1 },
+      { cx: CARROM_BORDER, cy: CARROM_SIZE - CARROM_BORDER, sx: 1, sy: -1 },
+      { cx: CARROM_SIZE - CARROM_BORDER, cy: CARROM_SIZE - CARROM_BORDER, sx: -1, sy: -1 },
+    ];
+
+    const traceMouthArc = () => {
+      ctx.moveTo(jaw, 0);
+      ctx.bezierCurveTo(jaw - 7, 0, c + r, 8, c + r, c);
+      ctx.arc(c, c, r, 0, Math.PI / 2);
+      ctx.bezierCurveTo(8, c + r, 0, jaw - 7, 0, jaw);
+    };
+
+    const traceFunnelOpening = () => {
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      traceMouthArc();
+      ctx.bezierCurveTo(-9, 36, -16, 10, -10, -4);
+      ctx.quadraticCurveTo(-13, -13, -4, -10);
+      ctx.bezierCurveTo(10, -16, 36, -9, jaw, 0);
+      ctx.closePath();
+    };
+
+    for (const corner of corners) {
+      ctx.save();
+      ctx.translate(corner.cx, corner.cy);
+      ctx.scale(corner.sx, corner.sy);
+
+      // 1. Outer wooden corner collar fusing pocket cleanly into corner frame
+      ctx.beginPath();
+      ctx.moveTo(jaw + 4, -4);
+      ctx.bezierCurveTo(jaw - 5, -3, c + r + 3.5, 7, c + r + 3.5, c);
+      ctx.arc(c, c, r + 3.5, 0, Math.PI / 2);
+      ctx.bezierCurveTo(7, c + r + 3.5, -3, jaw - 5, -4, jaw + 4);
+      ctx.bezierCurveTo(-13, 38, -20, 11, -14, -7);
+      ctx.quadraticCurveTo(-17, -17, -7, -14);
+      ctx.bezierCurveTo(11, -20, 38, -13, jaw + 4, -4);
+      ctx.closePath();
+      const collarGrad = ctx.createLinearGradient(-15, -15, c + r, c + r);
+      collarGrad.addColorStop(0, '#2a1308');
+      collarGrad.addColorStop(0.55, '#4e2813');
+      collarGrad.addColorStop(1, '#6f3e21');
+      ctx.fillStyle = collarGrad;
       ctx.fill();
-      ctx.strokeStyle = '#78350f';
-      ctx.lineWidth = 3;
+
+      // 2. Conical interior clipped inside recessed funnel path
+      ctx.save();
+      traceFunnelOpening();
+      ctx.clip();
+
+      const coneGrad = ctx.createRadialGradient(-2, -2, 4, c + 4, c + 4, r + 18);
+      coneGrad.addColorStop(0, '#020617');
+      coneGrad.addColorStop(0.42, '#0b1220');
+      coneGrad.addColorStop(0.78, '#1e293b');
+      coneGrad.addColorStop(1, '#334155');
+      ctx.fillStyle = coneGrad;
+      ctx.fillRect(-20, -20, jaw + 30, jaw + 30);
+
+      // Concentric tapered cone rings converging toward the corner apex
+      for (const ring of [
+        { cx: 14, cy: 14, radius: 26, stroke: 'rgba(148, 163, 184, 0.14)' },
+        { cx: 7, cy: 7, radius: 18, stroke: 'rgba(148, 163, 184, 0.11)' },
+        { cx: 0, cy: 0, radius: 10, stroke: 'rgba(148, 163, 184, 0.08)' },
+      ]) {
+        ctx.beginPath();
+        ctx.arc(ring.cx, ring.cy, ring.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(2, 6, 23, 0.72)';
+        ctx.lineWidth = 2.4;
+        ctx.stroke();
+        ctx.strokeStyle = ring.stroke;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Soft inner shadow cast by overhanging wooden corner frame
+      ctx.beginPath();
+      ctx.moveTo(jaw + 2, -2);
+      ctx.bezierCurveTo(10, -16, -9, -9, -2, jaw + 2);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.lineWidth = 6;
       ctx.stroke();
+      ctx.restore();
+
+      // 3. Open playing-surface jaw bevel & subtle warm lip highlight
+      ctx.beginPath();
+      traceMouthArc();
+      ctx.strokeStyle = '#5c2d13';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      ctx.beginPath();
+      traceMouthArc();
+      ctx.strokeStyle = 'rgba(253, 230, 138, 0.28)';
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+
+      // 4. Outer corner wood rim hugging the recessed back wall
+      ctx.beginPath();
+      ctx.moveTo(jaw + 1, -3);
+      ctx.bezierCurveTo(11, -18, -12, -12, -3, jaw + 1);
+      ctx.strokeStyle = '#6f3e21';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+
+      ctx.restore();
     }
 
     // Sinking animations
@@ -860,11 +963,13 @@ export const CarromGame: React.FC<CarromGameProps> = ({ onBack, initialRoomCode,
         if (result.newlyPocketed.length > 0) {
           pocketedThisTurnRef.current.push(...result.newlyPocketed);
           for (const ev of result.pocketedInto) {
+            const cornerShiftX = ev.pocket.x < CARROM_SIZE / 2 ? -9 : 9;
+            const cornerShiftY = ev.pocket.y < CARROM_SIZE / 2 ? -9 : 9;
             sinkingRef.current.push({
               x: ev.entryX,
               y: ev.entryY,
-              toX: ev.pocket.x,
-              toY: ev.pocket.y,
+              toX: ev.pocket.x + cornerShiftX,
+              toY: ev.pocket.y + cornerShiftY,
               radius: ev.body.radius,
               color: ev.body.color,
               start: now,
