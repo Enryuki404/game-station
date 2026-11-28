@@ -230,51 +230,43 @@ export const TableFeltWatermark: React.FC = () => (
   >
     <svg
       viewBox="0 0 260 260"
-      className="w-56 h-56 sm:w-72 sm:h-72 md:w-80 md:h-80 text-white opacity-[0.24] drop-shadow-[0_2px_6px_rgba(0,0,0,0.28)]"
+      className="w-56 h-56 sm:w-72 sm:h-72 md:w-80 md:h-80 opacity-35 drop-shadow-[0_4px_14px_rgba(0,0,0,0.35)]"
     >
-      {/* Double silk-screened felt perimeter rings */}
-      <circle cx="130" cy="130" r="122" fill="none" stroke="currentColor" strokeWidth="2.2" opacity="0.75" />
-      <circle
-        cx="130"
-        cy="130"
-        r="112"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeDasharray="6 6"
-        opacity="0.55"
-      />
+      {/* 4-color segmented LAST ONE! ring */}
+      <path d="M 130 34 A 84 84 0 0 0 46 118" fill="none" stroke="#f43f5e" strokeWidth="18" strokeLinecap="round" />
+      <path d="M 130 34 A 84 84 0 0 1 214 118" fill="none" stroke="#38bdf8" strokeWidth="18" strokeLinecap="round" />
+      <path d="M 46 118 A 84 84 0 0 0 130 202" fill="none" stroke="#fbbf24" strokeWidth="18" strokeLinecap="round" />
+      <path d="M 214 118 A 84 84 0 0 1 130 202" fill="none" stroke="#10b981" strokeWidth="18" strokeLinecap="round" />
 
-      {/* 4-segmented rounded emblem ring */}
-      <path d="M 65 109 A 66 66 0 0 1 119 55" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
-      <path d="M 141 55 A 66 66 0 0 1 195 109" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
-      <path d="M 195 131 A 66 66 0 0 1 141 185" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
-      <path d="M 119 185 A 66 66 0 0 1 65 131" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
+      {/* Dark core */}
+      <circle cx="130" cy="118" r="58" fill="#0f172a" stroke="rgba(255,255,255,0.28)" strokeWidth="3" />
 
-      {/* Inner emblem circle, crown & #1 */}
-      <circle cx="130" cy="120" r="46" fill="none" stroke="currentColor" strokeWidth="2.6" opacity="0.75" />
-      <path d="M 108 98 L 117 84 L 130 93 L 143 84 L 152 98 Z" fill="currentColor" />
+      {/* Golden crown */}
+      <path d="M 101 89 L 114 70 L 130 83 L 146 70 L 159 89 Z" fill="#fbbf24" />
+
+      {/* Bold white #1 */}
       <text
         x="130"
-        y="150"
+        y="153"
         textAnchor="middle"
-        fontSize="52"
+        fontSize="64"
         fontWeight="900"
-        fill="currentColor"
+        fill="#ffffff"
         fontFamily="system-ui, sans-serif"
       >
         1
       </text>
 
-      {/* Tracked LAST ONE felt wordmark */}
+      {/* Rounded LAST ONE pill */}
+      <rect x="52" y="216" width="156" height="32" rx="16" fill="rgba(15,23,42,0.75)" stroke="rgba(255,255,255,0.28)" strokeWidth="2" />
       <text
         x="130"
-        y="218"
+        y="237"
         textAnchor="middle"
         fontSize="15"
         fontWeight="900"
-        letterSpacing="5"
-        fill="currentColor"
+        letterSpacing="3.5"
+        fill="#ffffff"
         fontFamily="system-ui, sans-serif"
       >
         LAST ONE
