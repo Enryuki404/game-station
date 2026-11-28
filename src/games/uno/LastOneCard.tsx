@@ -313,8 +313,8 @@ export const LastOneCard: React.FC<{
   const sharedClasses = `${dim} relative border-white/95 bg-gradient-to-br ${palette.grad} ${palette.corner} shadow-xl flex flex-col justify-between select-none overflow-hidden transition-all duration-200 ease-out ${
     onClick
       ? playable
-        ? 'cursor-pointer hover:-translate-y-4 hover:scale-105 hover:shadow-2xl ring-2 ring-white/95 btn-tactile'
-        : 'brightness-[0.44] saturate-[0.75] cursor-not-allowed'
+        ? 'cursor-pointer hover:-translate-y-2.5 hover:scale-105 hover:shadow-2xl ring-2 ring-white/95 btn-tactile'
+        : 'brightness-[0.44] saturate-[0.75] pointer-events-none'
       : ''
   } ${className}`;
 
