@@ -675,8 +675,8 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                     </div>
                     <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">{opp.cardCount} kartu tersisa</p>
                   </div>
-                  <div className="flex -space-x-2.5 sm:-space-x-3 shrink-0">
-                    {Array.from({ length: Math.min(opp.cardCount, 4) }).map((_, i) => (
+                  <div className="flex items-center gap-1 shrink-0">
+                    {Array.from({ length: Math.min(opp.cardCount, 3) }).map((_, i) => (
                       <LastOneCardBack key={i} size="mini" />
                     ))}
                   </div>
