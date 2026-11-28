@@ -38,19 +38,37 @@ const GameCoverArtwork: React.FC<{ id: GameId; title: string; subtitle: string; 
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
       ) : id === 'uno' ? (
-        <div className="pointer-events-none absolute inset-0 felt-surface overflow-hidden group-hover:scale-105 transition-transform duration-500 ease-out">
-          <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-transparent to-rose-500/20" />
-          <div className="absolute right-40 top-6 -rotate-16 opacity-90">
-            <LastOneCardBack size="sm" />
-          </div>
-          <div className="absolute right-28 top-3 -rotate-6">
-            <LastOneCard card={{ id: 'cov-w4', color: 'wild', value: 'wild4' }} size="sm" />
-          </div>
-          <div className="absolute right-16 top-4 rotate-6">
-            <LastOneCard card={{ id: 'cov-r7', color: 'red', value: '7' }} size="sm" />
-          </div>
-          <div className="absolute right-5 top-7 rotate-16">
-            <LastOneCard card={{ id: 'cov-b2', color: 'blue', value: 'draw2' }} size="sm" />
+        <div className="pointer-events-none absolute inset-0 uno-felt-table overflow-hidden group-hover:scale-105 transition-transform duration-500 ease-out">
+          <div className="absolute inset-0 bg-gradient-to-tr from-black/65 via-transparent to-emerald-400/10" />
+          {/* Decorative glowing directional arc behind fanned cover cards */}
+          <svg
+            viewBox="0 0 300 160"
+            className="absolute right-0 top-1 w-72 h-40 opacity-50"
+            aria-hidden="true"
+          >
+            <path
+              d="M 48 118 C 95 22, 225 18, 274 78"
+              fill="none"
+              stroke="#4ade80"
+              strokeWidth="4"
+              strokeLinecap="round"
+              opacity="0.7"
+            />
+            <path d="M 268 62 L 286 86 L 256 82 Z" fill="#4ade80" opacity="0.8" />
+          </svg>
+          <div className="absolute right-3 top-3 sm:right-4 sm:top-3.5 flex items-center scale-[0.78] sm:scale-[0.82] origin-top-right">
+            <div className="-rotate-12 translate-y-2 drop-shadow-2xl">
+              <LastOneCardBack size="md" />
+            </div>
+            <div className="-ml-2.5 -rotate-4 -translate-y-1 drop-shadow-2xl">
+              <LastOneCard card={{ id: 'cov-w4', color: 'wild', value: 'wild4' }} size="md" />
+            </div>
+            <div className="-ml-2.5 rotate-4 -translate-y-0.5 drop-shadow-2xl">
+              <LastOneCard card={{ id: 'cov-r7', color: 'red', value: '7' }} size="md" />
+            </div>
+            <div className="-ml-2.5 rotate-12 translate-y-2 drop-shadow-2xl">
+              <LastOneCard card={{ id: 'cov-b2', color: 'blue', value: 'draw2' }} size="md" />
+            </div>
           </div>
         </div>
       ) : id === 'chess' ? (

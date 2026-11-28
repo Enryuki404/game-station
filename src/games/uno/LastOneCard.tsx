@@ -259,7 +259,7 @@ export const LastOneCard: React.FC<{
         ? 'w-14 h-[80px] p-1.5 rounded-md border-2'
         : 'w-16 h-[92px] sm:w-[76px] sm:h-[108px] p-1.5 rounded-lg border-2';
 
-  const cornerCls = size === 'xs' ? 'text-[9px]' : 'text-[10px] sm:text-[11px]';
+  const cornerCls = size === 'xs' ? 'text-[8.5px]' : size === 'sm' ? 'text-[9px]' : 'text-[10px] sm:text-[11px]';
   const cornerIconCls = size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3 sm:w-3.5 sm:h-3.5';
   const cornerContent =
     card.value === 'skipAll' ? (
@@ -328,6 +328,7 @@ export const LastOneCardBack: React.FC<{
   className?: string;
 }> = ({ size = 'md', className = '' }) => {
   const isMini = size === 'mini';
+  const isSm = size === 'sm';
   const dim =
     size === 'mini'
       ? 'w-5 h-7 sm:w-6 sm:h-[34px] rounded-[4px] border-[1.5px]'
@@ -355,10 +356,16 @@ export const LastOneCardBack: React.FC<{
       )}
 
       {/* Custom LAST ONE! Original Emblem: 4-color arc ring + #1 crown/star mark */}
-      <div className="relative z-10 flex flex-col items-center justify-center gap-1">
+      <div className={`relative z-10 flex flex-col items-center justify-center ${isSm ? 'gap-0.5' : 'gap-1'}`}>
         <svg
           viewBox="0 0 64 64"
-          className={isMini ? 'w-3.5 h-3.5 sm:w-4 sm:h-4' : 'w-9 h-9 sm:w-12 sm:h-12 drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]'}
+          className={
+            isMini
+              ? 'w-3.5 h-3.5 sm:w-4 sm:h-4'
+              : isSm
+                ? 'w-7 h-7 drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]'
+                : 'w-9 h-9 sm:w-12 sm:h-12 drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]'
+          }
           aria-hidden="true"
         >
           {/* 4-color segmented ring */}
@@ -388,7 +395,13 @@ export const LastOneCardBack: React.FC<{
         </svg>
 
         {!isMini && (
-          <span className="px-1.5 py-[1px] rounded-full bg-white/10 border border-white/20 text-[7px] sm:text-[8.5px] font-black tracking-wider text-white uppercase leading-tight">
+          <span
+            className={`rounded-full bg-white/10 border border-white/20 font-black text-white uppercase whitespace-nowrap ${
+              isSm
+                ? 'px-1 py-[1px] text-[6px] tracking-wide leading-none'
+                : 'px-1.5 py-[1px] text-[7px] sm:text-[8.5px] tracking-wider leading-tight'
+            }`}
+          >
             LAST ONE
           </span>
         )}
