@@ -259,9 +259,9 @@ export const LastOneCard: React.FC<{
       />
 
       {/* Top-left index */}
-      <span className={`relative z-10 ${cornerCls} font-black leading-none text-left tracking-tight`}>
-        {corner}
-        {needsUnderline && <span className="block w-2 h-[1.5px] bg-current mt-[1px]" />}
+      <span className={`relative z-10 self-start inline-flex flex-col items-center w-fit ${cornerCls} font-black leading-none tracking-tight`}>
+        <span>{corner}</span>
+        {needsUnderline && <span className="w-2 h-[1.5px] bg-current mt-[1px]" />}
       </span>
 
       {/* Upright classic rectangular inner frame */}
@@ -272,9 +272,9 @@ export const LastOneCard: React.FC<{
       </div>
 
       {/* Bottom-right inverted index */}
-      <span className={`relative z-10 ${cornerCls} font-black leading-none text-right rotate-180 tracking-tight`}>
-        {corner}
-        {needsUnderline && <span className="block w-2 h-[1.5px] bg-current mt-[1px]" />}
+      <span className={`relative z-10 self-end inline-flex flex-col items-center w-fit rotate-180 ${cornerCls} font-black leading-none tracking-tight`}>
+        <span>{corner}</span>
+        {needsUnderline && <span className="w-2 h-[1.5px] bg-current mt-[1px]" />}
       </span>
     </>
   );
