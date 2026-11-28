@@ -26,7 +26,8 @@ import {
   type UnoColor,
   type UnoVariant,
 } from './unoEngine';
-import { LastOneCard, LastOneCardBack, LastOneDrawDeck } from './LastOneCard';
+import { LastOneCard, LastOneDrawDeck } from './LastOneCard';
+import { DirectionGlowRing, OpponentSeat, SeatAvatar, type TableOpponent } from './UnoTableParts';
 
 interface UnoGameProps {
   onBack: () => void;
@@ -399,6 +400,39 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
   const isHostOrOffline =
     mode !== 'online' || !onlineSession || onlineSession.room.hostId === onlineSession.playerId;
 
+  const totalSeats = isOnlinePlaying ? onlineUno!.players.length : match.players.length;
+  const orderedOpponents: TableOpponent[] = [];
+  for (let offset = 1; offset < totalSeats; offset++) {
+    const idx = (mySeatIdx + offset) % totalSeats;
+    const opp = opponentSeats.find((p) => p.seatIdx === idx);
+    if (opp) orderedOpponents.push(opp);
+  }
+
+  let leftSeat: TableOpponent | null = null;
+  let rightSeat: TableOpponent | null = null;
+  let topSeats: TableOpponent[] = [];
+  if (orderedOpponents.length === 1) {
+    topSeats = [orderedOpponents[0]];
+  } else if (orderedOpponents.length === 2) {
+    leftSeat = orderedOpponents[0];
+    rightSeat = orderedOpponents[1];
+  } else if (orderedOpponents.length >= 3) {
+    leftSeat = orderedOpponents[0];
+    topSeats = orderedOpponents.slice(1, orderedOpponents.length - 1);
+    rightSeat = orderedOpponents[orderedOpponents.length - 1];
+  }
+
+  const fanOverlapClass =
+    myHand.length <= 5
+      ? '-ml-1.5 sm:-ml-2'
+      : myHand.length <= 8
+        ? '-ml-3.5 sm:-ml-4'
+        : myHand.length <= 12
+          ? '-ml-6 sm:-ml-7'
+          : '-ml-8 sm:-ml-10';
+  const fanMid = (myHand.length - 1) / 2;
+  const fanStepDeg = myHand.length <= 7 ? 2.4 : myHand.length <= 12 ? 1.6 : 1.0;
+
   return (
     <GameShell
       title={`LAST ONE! — ${UNO_VARIANT_META[activeVariant].label}`}
@@ -605,180 +639,231 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
           )}
         </div>
       ) : (
-        <div className="rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900/70 p-3 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl">
-          {/* Opponents row */}
-          <div
-            className={`grid gap-2 sm:gap-3 ${
-              opponentSeats.length === 1
-                ? 'grid-cols-1 max-w-xs mx-auto'
-                : opponentSeats.length === 2
-                  ? 'grid-cols-2 max-w-2xl mx-auto'
-                  : opponentSeats.length === 3
-                    ? 'grid-cols-2 sm:grid-cols-3'
-                    : opponentSeats.length === 4
-                      ? 'grid-cols-2 sm:grid-cols-4'
-                      : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
-            }`}
-          >
-            {opponentSeats.map((opp) => {
-              const active = currentTurnIdx === opp.seatIdx && winnerIdx === null && !opp.eliminated;
-              return (
-                <div
-                  key={opp.id}
-                  className={`rounded-xl sm:rounded-2xl border p-2 sm:p-3 flex items-center justify-between gap-1.5 sm:gap-2 overflow-hidden min-w-0 transition ${
-                    opp.eliminated
-                      ? 'border-rose-900/50 bg-rose-950/20 opacity-55'
-                      : active
-                        ? 'border-amber-400/70 bg-amber-500/10 shadow-lg shadow-amber-500/10'
-                        : 'border-slate-800 bg-slate-950/50'
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0 rounded-full ${
-                          opp.eliminated ? 'bg-rose-500' : active ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
-                        }`}
-                      />
-                      <span className="font-bold text-xs sm:text-sm text-white truncate">
-                        {opp.name} {!opp.connected ? '(Offline)' : ''}
-                      </span>
-                    </div>
-                    <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">
-                      {opp.eliminated ? 'KO (25+ kartu)' : `${opp.cardCount} kartu tersisa`}
-                    </p>
-                  </div>
-                  {!opp.eliminated && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      {Array.from({ length: Math.min(opp.cardCount, 3) }).map((_, i) => (
-                        <LastOneCardBack key={i} size="mini" />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Center Table */}
-          <div className="felt-surface relative rounded-3xl border border-emerald-700/40 p-4 sm:p-7 flex flex-col items-center gap-4 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs">
+        <div className="uno-felt-table rounded-2xl sm:rounded-3xl border border-emerald-700/45 relative overflow-hidden min-h-[530px] sm:min-h-[600px] lg:min-h-[640px] flex flex-col justify-between p-3 sm:p-5">
+          {/* Subtle top corner HUD badges */}
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
               {activeVariant !== 'allwild' ? (
-                <span className={`px-3 py-1 rounded-full border font-semibold transition-colors ${COLOR_STYLES[activeColor].pill}`}>
-                  Warna Aktif: {UNO_COLOR_LABELS[activeColor]}
+                <span className={`px-2.5 py-1 rounded-full border backdrop-blur-sm font-semibold inline-flex items-center gap-1.5 ${COLOR_STYLES[activeColor].pill}`}>
+                  <span className={`w-2 h-2 rounded-full ${COLOR_STYLES[activeColor].ring}`} />
+                  {UNO_COLOR_LABELS[activeColor]}
                 </span>
               ) : (
-                <span className="px-3 py-1 rounded-full border border-violet-400/40 bg-violet-500/20 text-violet-200 font-semibold">
-                  Mode All Wild
-                </span>
-              )}
-              <span className="px-3 py-1 rounded-full border border-slate-700 bg-slate-900/70 text-slate-200 inline-flex items-center gap-1.5 font-medium">
-                <RotateCw className={`w-3.5 h-3.5 transition-transform duration-300 ${direction === -1 ? '-scale-x-100' : ''}`} />
-                {direction === 1 ? 'Searah Jarum Jam' : 'Berlawanan Jarum Jam'}
-              </span>
-              {pendingDraw > 0 && (
-                <span className="px-3 py-1 rounded-full border border-rose-400/60 bg-rose-500/25 text-rose-200 inline-flex items-center gap-1 font-extrabold animate-pulse">
-                  <Flame className="w-3.5 h-3.5 text-amber-300" />
-                  Tumpukan Penalti: +{pendingDraw}
+                <span className="px-2.5 py-1 rounded-full border border-violet-400/40 bg-violet-500/20 text-violet-200 font-semibold backdrop-blur-sm">
+                  All Wild
                 </span>
               )}
               {activeVariant === 'nomercy' && (
-                <span className="px-2.5 py-1 rounded-full border border-amber-400/35 bg-amber-500/15 text-amber-200 inline-flex items-center gap-1 font-semibold">
+                <span className="px-2.5 py-1 rounded-full border border-amber-400/35 bg-black/45 text-amber-200 inline-flex items-center gap-1 font-semibold backdrop-blur-sm">
                   <ShieldAlert className="w-3.5 h-3.5" /> Batas KO: 25
                 </span>
               )}
             </div>
 
-            <div className="relative flex items-center justify-center gap-6 sm:gap-10 py-2">
-              <LastOneDrawDeck
-                drawCount={drawCount}
-                canDraw={isHumanTurn}
-                hasPlayableCard={hasPlayableCard}
-                pendingDraw={pendingDraw}
-                onDraw={handleDrawClick}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {pendingDraw > 0 && (
+                <span className="px-2.5 py-1 rounded-full border border-rose-400/70 bg-rose-600/80 text-white inline-flex items-center gap-1 font-extrabold animate-pulse shadow-lg">
+                  <Flame className="w-3.5 h-3.5 text-amber-200" />
+                  Tumpukan +{pendingDraw}
+                </span>
+              )}
+              <span className="px-2.5 py-1 rounded-full border border-white/15 bg-black/45 text-emerald-50 inline-flex items-center gap-1.5 font-medium backdrop-blur-sm">
+                <RotateCw className={`w-3.5 h-3.5 transition-transform duration-300 ${direction === -1 ? '-scale-x-100' : ''}`} />
+                <span className="hidden sm:inline">{direction === 1 ? 'Searah Jarum Jam' : 'Berlawanan Jarum Jam'}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Mobile compact opponent bar (< md) */}
+          <div className="flex md:hidden items-start justify-around flex-wrap gap-2 py-2 relative z-10">
+            {orderedOpponents.map((opp) => (
+              <OpponentSeat
+                key={opp.id}
+                player={opp}
+                isActive={currentTurnIdx === opp.seatIdx && winnerIdx === null && !opp.eliminated}
+                position="compact"
+                isNoMercy={activeVariant === 'nomercy'}
+              />
+            ))}
+          </div>
+
+          {/* Desktop/Tablet Top Seat Row (>= md) */}
+          <div className="hidden md:flex items-center justify-center gap-10 lg:gap-14 pt-1 relative z-10 min-h-[76px]">
+            {topSeats.map((opp) => (
+              <OpponentSeat
+                key={opp.id}
+                player={opp}
+                isActive={currentTurnIdx === opp.seatIdx && winnerIdx === null && !opp.eliminated}
+                position="top"
+                isNoMercy={activeVariant === 'nomercy'}
+              />
+            ))}
+          </div>
+
+          {/* Middle Table Row: Left Seat | Center Piles + Glow Ring | Right Seat */}
+          <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-[minmax(145px,1fr)_auto_minmax(145px,1fr)] items-center gap-2 py-2 sm:py-3">
+            <div className="hidden md:flex justify-start items-center pl-1 lg:pl-3">
+              {leftSeat && (
+                <OpponentSeat
+                  player={leftSeat}
+                  isActive={currentTurnIdx === leftSeat.seatIdx && winnerIdx === null && !leftSeat.eliminated}
+                  position="left"
+                  isNoMercy={activeVariant === 'nomercy'}
+                />
+              )}
+            </div>
+
+            <div className="relative flex flex-col items-center justify-center py-4 sm:py-6">
+              <DirectionGlowRing
+                activeColor={activeColor}
+                direction={direction}
+                isAllWild={activeVariant === 'allwild'}
               />
 
-              <div className="relative">
-                {activeVariant !== 'allwild' && (
-                  <div className={`absolute -inset-2 rounded-2xl blur-md opacity-45 transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
-                )}
-                <div key={topCard.id} className="relative animate-card-throw">
-                  <LastOneCard card={topCard} size="md" />
+              <div className="relative z-10 flex items-center justify-center gap-6 sm:gap-10">
+                <LastOneDrawDeck
+                  drawCount={drawCount}
+                  canDraw={isHumanTurn}
+                  hasPlayableCard={hasPlayableCard}
+                  pendingDraw={pendingDraw}
+                  onDraw={handleDrawClick}
+                />
+
+                <div className="relative">
+                  {activeVariant !== 'allwild' && (
+                    <div className={`absolute -inset-2 rounded-2xl blur-md opacity-45 transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
+                  )}
+                  <div key={topCard.id} className="relative animate-card-throw">
+                    <LastOneCard card={topCard} size="md" className="rotate-[4deg]" />
+                  </div>
+                  {activeVariant !== 'allwild' && (
+                    <div className={`absolute -bottom-2 -right-2 w-5 h-5 rounded-full border-2 border-white shadow-md transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
+                  )}
                 </div>
-                {activeVariant !== 'allwild' && (
-                  <div className={`absolute -bottom-2 -right-2 w-5 h-5 rounded-full border-2 border-white shadow-md transition-colors duration-300 ${COLOR_STYLES[activeColor].ring}`} />
-                )}
               </div>
 
               {actionBurst && (
                 <div
                   key={actionBurst.id}
-                  className={`pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 px-3.5 py-1 rounded-full text-xs font-black tracking-wider shadow-xl animate-banner-pop z-20 ${actionBurst.tone}`}
+                  className={`pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 px-3.5 py-1 rounded-full text-xs font-black tracking-wider shadow-xl animate-banner-pop z-20 whitespace-nowrap ${actionBurst.tone}`}
                 >
                   {actionBurst.text}
                 </div>
               )}
+
+              <p className="relative z-10 mt-3 text-center text-[11px] sm:text-xs font-medium text-emerald-50/95 bg-black/45 border border-white/10 px-3.5 py-1 rounded-full backdrop-blur-sm max-w-md">
+                {statusText}
+              </p>
             </div>
 
-            <p className="text-center text-xs sm:text-sm font-medium text-emerald-100 bg-black/30 px-4 py-1.5 rounded-full">
-              {statusText}
-            </p>
+            <div className="hidden md:flex justify-end items-center pr-1 lg:pr-3">
+              {rightSeat && (
+                <OpponentSeat
+                  player={rightSeat}
+                  isActive={currentTurnIdx === rightSeat.seatIdx && winnerIdx === null && !rightSeat.eliminated}
+                  position="right"
+                  isNoMercy={activeVariant === 'nomercy'}
+                />
+              )}
+            </div>
           </div>
 
           <ConfettiBurst trigger={confettiKey} />
 
-          {/* Human Hand (Only myHand on this screen!) */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    myPlayerMeta?.eliminated ? 'bg-rose-500' : isHumanTurn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
-                  }`}
-                />
-                <h2 className="text-sm sm:text-base font-bold text-white">
-                  {myPlayerMeta?.eliminated
-                    ? `${myPlayerMeta.name} (KO — Tersingkir)`
-                    : `${myPlayerMeta?.name ?? 'Kartumu'} (${myHand.length}${activeVariant === 'nomercy' ? '/25' : ''} kartu)`}
-                </h2>
-                {myPlayerMeta?.saidUno && !myPlayerMeta?.eliminated && (
-                  <span className="px-2 py-0.5 text-[11px] font-extrabold rounded-full bg-amber-400 text-slate-950">
-                    LAST ONE AKTIF
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                {myHand.length <= 2 &&
-                  myHand.length >= 1 &&
-                  !myPlayerMeta?.saidUno &&
-                  !myPlayerMeta?.eliminated &&
-                  winnerIdx === null && (
-                    <button
-                      type="button"
-                      onClick={handleCallUno}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-rose-500 px-4 py-1.5 text-xs sm:text-sm font-extrabold text-slate-950 shadow-lg animate-pulse-glow cursor-pointer"
+          {/* Bottom Player Hand & Corner Controls */}
+          <div className="relative z-20 pt-1">
+            {/* Fanned Human Hand */}
+            <div className="w-full overflow-x-auto no-scrollbar pt-7 pb-2 px-4 sm:px-6 md:px-28">
+              <div className="flex items-end justify-center mx-auto w-max">
+                {myHand.map((card, i) => {
+                  const playable =
+                    isHumanTurn && isCardPlayable(card, topCard, activeColor, pendingDraw, pendingDrawMin, activeVariant);
+                  const offset = i - fanMid;
+                  const angle = myHand.length > 1 ? offset * fanStepDeg : 0;
+                  const archY = Math.abs(offset) * (myHand.length > 10 ? 0.9 : 1.5);
+                  return (
+                    <div
+                      key={card.id}
+                      style={{ transform: `rotate(${angle}deg) translateY(${archY}px)` }}
+                      className={`relative transition-transform duration-200 hover:z-40 ${
+                        i === 0 ? '' : fanOverlapClass
+                      } ${playable ? 'z-20 -translate-y-2.5' : 'z-10'}`}
                     >
-                      <BellRing className="w-4 h-4" />
-                      TERIAK LAST ONE!
-                    </button>
-                  )}
+                      <LastOneCard
+                        card={card}
+                        playable={playable}
+                        onClick={() => handleCardClick(card)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2 pb-1">
-              {myHand.map((card) => {
-                const playable =
-                  isHumanTurn && isCardPlayable(card, topCard, activeColor, pendingDraw, pendingDrawMin, activeVariant);
-                return (
-                  <LastOneCard
-                    key={card.id}
-                    card={card}
-                    playable={playable}
-                    onClick={() => handleCardClick(card)}
+            {/* Bottom-Left Player Avatar + Bottom-Right LAST ONE Button */}
+            <div className="flex items-end justify-between gap-3 pt-1 md:pt-0 md:pointer-events-none">
+              <div className="md:absolute md:bottom-0 md:left-0 flex flex-col items-start gap-1.5 md:pointer-events-auto">
+                <span
+                  className={`px-2.5 py-0.5 rounded-md text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-md border ${
+                    myPlayerMeta?.eliminated
+                      ? 'bg-rose-700 text-white border-rose-300/60'
+                      : isHumanTurn
+                        ? 'bg-rose-600 text-white border-rose-300/70 animate-pulse'
+                        : 'bg-black/55 text-slate-300 border-white/15'
+                  }`}
+                >
+                  {myPlayerMeta?.eliminated
+                    ? 'KO — Tersingkir'
+                    : isHumanTurn
+                      ? 'Giliranmu'
+                      : 'Menunggu'}
+                </span>
+                <div className="flex items-end gap-2.5">
+                  <SeatAvatar
+                    seatIdx={mySeatIdx}
+                    name={myPlayerMeta?.name ?? 'Kamu'}
+                    cardCount={myHand.length}
+                    isActive={isHumanTurn}
+                    eliminated={Boolean(myPlayerMeta?.eliminated)}
+                    saidUno={Boolean(myPlayerMeta?.saidUno)}
+                    isNoMercy={activeVariant === 'nomercy'}
                   />
-                );
-              })}
+                  <span className="text-[11px] font-bold text-white/85 bg-black/45 border border-white/10 px-2 py-0.5 rounded-md mb-0.5">
+                    {myPlayerMeta?.name ?? 'Kamu'}
+                    {activeVariant === 'nomercy' ? ` (${myHand.length}/25)` : ''}
+                  </span>
+                </div>
+              </div>
+
+              <div className="md:absolute md:bottom-0 md:right-0 md:pointer-events-auto">
+                {myHand.length <= 2 &&
+                myHand.length >= 1 &&
+                !myPlayerMeta?.saidUno &&
+                !myPlayerMeta?.eliminated &&
+                winnerIdx === null ? (
+                  <button
+                    type="button"
+                    onClick={handleCallUno}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-rose-500 px-5 py-2.5 text-xs sm:text-sm font-black uppercase tracking-wider text-slate-950 shadow-xl ring-2 ring-amber-200 animate-pulse-glow cursor-pointer btn-tactile"
+                  >
+                    <BellRing className="w-4 h-4" />
+                    LAST ONE!
+                  </button>
+                ) : myPlayerMeta?.saidUno && !myPlayerMeta?.eliminated ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/60 bg-amber-400/20 px-4 py-2 text-xs font-extrabold text-amber-200 backdrop-blur-sm">
+                    <BellRing className="w-3.5 h-3.5" /> LAST ONE ✓
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/45 px-4 py-2 text-xs font-extrabold uppercase tracking-wider text-white/35 backdrop-blur-sm cursor-not-allowed"
+                  >
+                    <BellRing className="w-3.5 h-3.5" />
+                    LAST ONE!
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
