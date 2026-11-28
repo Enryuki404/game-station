@@ -310,7 +310,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
     if (!trimmed) return;
     setMoveLog((prev) => {
       if (prev.length > 0 && prev[prev.length - 1].text === trimmed) return prev;
-      return [...prev.slice(-24), { id: Date.now() + Math.random(), text: trimmed }];
+      return [...prev.slice(-2), { id: Date.now() + Math.random(), text: trimmed }];
     });
   }, [statusText]);
 
@@ -658,9 +658,9 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
         </div>
       ) : (
         <div className="uno-felt-table rounded-2xl sm:rounded-3xl border border-emerald-700/45 relative overflow-hidden min-h-[530px] sm:min-h-[600px] lg:min-h-[640px] flex flex-col justify-between p-3 sm:p-5">
-          {/* Top-left compact HUD badges + Top-right Move History Chat */}
+          {/* Top-left compact HUD badges + Top-right fading 3-line move feed */}
           <div className="relative z-30 flex items-start justify-between gap-2 text-[11px] sm:text-xs">
-            <div className="flex flex-wrap items-center gap-1.5 max-w-[calc(100%-13.5rem)] sm:max-w-[calc(100%-16rem)]">
+            <div className="flex flex-wrap items-center gap-1.5 max-w-[52%] md:max-w-[calc(100%-18rem)]">
               {activeVariant !== 'allwild' ? (
                 <span className={`px-2.5 py-1 rounded-full border backdrop-blur-sm font-semibold inline-flex items-center gap-1.5 ${COLOR_STYLES[activeColor].pill}`}>
                   <span className={`w-2 h-2 rounded-full ${COLOR_STYLES[activeColor].ring}`} />
@@ -690,9 +690,13 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                 </span>
               )}
             </div>
+
+            <div className="shrink-0 md:hidden">
+              <MoveHistoryChat entries={moveLog} />
+            </div>
           </div>
 
-          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-30">
+          <div className="hidden md:block md:absolute md:top-4 md:right-5 z-30">
             <MoveHistoryChat entries={moveLog} />
           </div>
 

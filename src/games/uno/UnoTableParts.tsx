@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
+import React from 'react';
 import type { UnoColor } from './unoEngine';
 import { LastOneCardBack } from './LastOneCard';
 
@@ -299,64 +298,30 @@ export interface MoveLogEntry {
   text: string;
 }
 
+const MOVE_OPACITIES = [1, 0.77, 0.44] as const;
+
 export const MoveHistoryChat: React.FC<{ entries: MoveLogEntry[] }> = ({ entries }) => {
-  const [expanded, setExpanded] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 640 : true
-  );
-  const listRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (expanded && listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
-  }, [entries.length, expanded]);
-
-  const latest = entries[entries.length - 1]?.text ?? 'Permainan dimulai.';
+  const recent = entries.slice(-3).reverse();
+  if (recent.length === 0) return null;
 
   return (
-    <div className="w-52 sm:w-60 rounded-xl border border-white/12 bg-black/45 backdrop-blur-md shadow-lg text-left overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full px-2.5 py-1.5 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-emerald-200/90 hover:bg-white/5 transition cursor-pointer"
-        aria-expanded={expanded}
-      >
-        <span className="inline-flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <MessageSquare className="w-3 h-3 text-emerald-300" />
-          Riwayat ({entries.length})
-        </span>
-        {expanded ? <ChevronUp className="w-3.5 h-3.5 text-white/60" /> : <ChevronDown className="w-3.5 h-3.5 text-white/60" />}
-      </button>
-
-      {expanded ? (
-        <div
-          ref={listRef}
-          className="max-h-[84px] overflow-y-auto no-scrollbar px-2.5 pb-2 space-y-1 border-t border-white/10 pt-1.5"
+    <div className="pointer-events-none select-none flex flex-col items-end gap-0.5 text-right max-w-[185px] sm:max-w-[260px]">
+      {recent.map((entry, idx) => (
+        <p
+          key={entry.id}
+          style={{
+            opacity: MOVE_OPACITIES[idx] ?? 0,
+            textShadow: '0 1px 4px rgba(0, 0, 0, 0.92), 0 0 10px rgba(0, 0, 0, 0.55)',
+          }}
+          className={
+            idx === 0
+              ? 'text-[11px] sm:text-xs font-bold text-white leading-snug transition-opacity duration-300'
+              : 'text-[10px] sm:text-[11px] font-medium text-white leading-snug transition-opacity duration-300'
+          }
         >
-          {entries.length === 0 ? (
-            <p className="text-[10.5px] text-white/70 leading-snug">Menunggu giliran pertama...</p>
-          ) : (
-            entries.map((entry, idx) => {
-              const isLatest = idx === entries.length - 1;
-              return (
-                <p
-                  key={entry.id}
-                  className={
-                    isLatest
-                      ? 'text-[11px] font-semibold text-white leading-snug'
-                      : 'text-[10px] text-white/55 leading-snug'
-                  }
-                >
-                  {entry.text}
-                </p>
-              );
-            })
-          )}
-        </div>
-      ) : (
-        <p className="truncate text-[10.5px] text-white/85 px-2.5 pb-1.5">{latest}</p>
-      )}
+          {entry.text}
+        </p>
+      ))}
     </div>
   );
 };
