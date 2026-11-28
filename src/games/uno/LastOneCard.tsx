@@ -47,7 +47,7 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
 
   if (card.value === 'skip') {
     return (
-      <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
+      <svg viewBox="0 0 48 48" className="w-6 h-6 sm:w-8 sm:h-8 drop-shadow-md" aria-hidden="true">
         <circle cx="24" cy="24" r="15" fill="none" stroke={strokeMain} strokeWidth="4.5" />
         <line x1="13" y1="35" x2="35" y2="13" stroke={strokeMain} strokeWidth="4.5" strokeLinecap="round" />
       </svg>
@@ -56,7 +56,7 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
 
   if (card.value === 'reverse') {
     return (
-      <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
+      <svg viewBox="0 0 48 48" className="w-6 h-6 sm:w-8 sm:h-8 drop-shadow-md" aria-hidden="true">
         <path
           d="M15 20 C15 13 24 11 30 14 L27 10 M30 14 L25 18"
           fill="none"
@@ -81,7 +81,7 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
 
   if (card.value === 'draw2') {
     return (
-      <svg viewBox="0 0 48 48" className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-md" aria-hidden="true">
+      <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
         <rect
           x="10"
           y="14"
@@ -122,7 +122,7 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
 
   if (card.value === 'wild') {
     return (
-      <svg viewBox="0 0 48 48" className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-md" aria-hidden="true">
+      <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
         <circle cx="24" cy="24" r="17" fill="#0f172a" stroke="#ffffff" strokeWidth="2.5" />
         <path d="M24 9 A15 15 0 0 0 9 24 L24 24 Z" fill="#ef4444" />
         <path d="M24 9 A15 15 0 0 1 39 24 L24 24 Z" fill="#0ea5e9" />
@@ -135,7 +135,7 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
 
   if (card.value === 'wild4') {
     return (
-      <svg viewBox="0 0 48 48" className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-md" aria-hidden="true">
+      <svg viewBox="0 0 48 48" className="w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md" aria-hidden="true">
         <rect x="6" y="16" width="12" height="17" rx="2.5" fill="#ef4444" stroke="#ffffff" strokeWidth="1.8" transform="rotate(-18 12 24)" />
         <rect x="13" y="11" width="12" height="17" rx="2.5" fill="#0ea5e9" stroke="#ffffff" strokeWidth="1.8" transform="rotate(-6 19 19)" />
         <rect x="21" y="12" width="12" height="17" rx="2.5" fill="#facc15" stroke="#ffffff" strokeWidth="1.8" transform="rotate(8 27 20)" />
@@ -148,14 +148,14 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
   return (
     <div className="flex flex-col items-center justify-center leading-none">
       <span
-        className={`font-black tracking-tighter text-2xl sm:text-3xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)] ${
+        className={`font-black tracking-tighter text-xl sm:text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)] ${
           isYellow ? 'text-slate-950' : 'text-white'
         }`}
       >
         {card.value}
       </span>
       {needsUnderline && (
-        <span className={`mt-0.5 w-3.5 sm:w-4 h-[2.5px] rounded-full ${isYellow ? 'bg-slate-950' : 'bg-white'}`} />
+        <span className={`mt-0.5 w-3 sm:w-3.5 h-[2px] rounded-full ${isYellow ? 'bg-slate-950' : 'bg-white'}`} />
       )}
     </div>
   );
@@ -174,10 +174,10 @@ export const LastOneCard: React.FC<{
 
   const dim =
     size === 'xs'
-      ? 'w-12 h-[72px] p-1 rounded-xl border-2'
+      ? 'w-12 h-[68px] p-1 rounded-md border-2'
       : size === 'sm'
-        ? 'w-14 h-[84px] p-1.5 rounded-xl border-2'
-        : 'w-[60px] h-[90px] sm:w-[82px] sm:h-[122px] p-1.5 rounded-2xl border-[2.5px] sm:border-[3px]';
+        ? 'w-14 h-[80px] p-1.5 rounded-md border-2'
+        : 'w-16 h-[92px] sm:w-[76px] sm:h-[108px] p-1.5 rounded-lg border-2';
 
   const cornerCls = size === 'xs' ? 'text-[9px]' : 'text-[10px] sm:text-[11px]';
 
@@ -203,9 +203,9 @@ export const LastOneCard: React.FC<{
         {needsUnderline && <span className="block w-2 h-[1.5px] bg-current mt-[1px]" />}
       </span>
 
-      {/* Tilted inner frosted emblem frame */}
-      <div className="relative z-10 self-center w-[76%] h-[58%] rounded-[46%] border-2 border-white/55 bg-black/20 -rotate-12 flex items-center justify-center shadow-inner">
-        <div className="rotate-12 flex items-center justify-center">
+      {/* Upright classic rectangular inner frame */}
+      <div className="relative z-10 self-center w-[76%] h-[58%] rounded-md border border-white/45 bg-black/20 flex items-center justify-center shadow-inner">
+        <div className="flex items-center justify-center">
           <CenterGraphic card={card} />
         </div>
       </div>
@@ -241,10 +241,10 @@ export const LastOneCardBack: React.FC<{
   const isMini = size === 'mini';
   const dim =
     size === 'mini'
-      ? 'w-5 h-7 sm:w-6 sm:h-9 rounded border-[1.5px]'
+      ? 'w-5 h-7 sm:w-6 sm:h-[34px] rounded-[4px] border-[1.5px]'
       : size === 'sm'
-        ? 'w-14 h-[84px] rounded-xl border-2'
-        : 'w-[60px] h-[90px] sm:w-[82px] sm:h-[122px] rounded-2xl border-[2.5px] sm:border-[3px]';
+        ? 'w-14 h-[80px] rounded-md border-2'
+        : 'w-16 h-[92px] sm:w-[76px] sm:h-[108px] rounded-lg border-2';
 
   return (
     <div
@@ -262,7 +262,7 @@ export const LastOneCardBack: React.FC<{
 
       {/* Inner framed border */}
       {!isMini && (
-        <div className="pointer-events-none absolute inset-1.5 rounded-xl border border-white/15" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-1 rounded-[4px] border border-white/15" aria-hidden="true" />
       )}
 
       {/* Custom LAST ONE! Original Emblem: 4-color arc ring + #1 crown/star mark */}
@@ -335,7 +335,7 @@ export const LastOneDrawDeck: React.FC<{
           onClick={onDraw}
           aria-label="Ambil kartu dari dek"
           title={canDraw ? 'Klik dek untuk mengambil 1 kartu' : 'Tunggu giliranmu'}
-          className={`relative block rounded-2xl transition-all duration-200 btn-tactile ${
+          className={`relative block rounded-lg transition-all duration-200 btn-tactile ${
             canDraw
               ? !hasPlayableCard
                 ? 'cursor-pointer hover:-translate-y-1.5 hover:scale-[1.04] ring-2 ring-amber-400 shadow-[0_0_24px_rgba(251,191,36,0.45)] animate-pulse-glow'

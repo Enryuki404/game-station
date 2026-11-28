@@ -14,9 +14,9 @@ interface PlayingCardProps {
 }
 
 const SIZE_CLASSES = {
-  sm: 'w-12 h-[68px] rounded-lg text-xs',
-  md: 'w-16 h-[92px] rounded-xl text-sm',
-  lg: 'w-20 h-[114px] rounded-xl text-base',
+  sm: 'w-12 h-[68px] rounded-md text-xs',
+  md: 'w-16 h-[92px] sm:w-[76px] sm:h-[108px] rounded-lg text-sm',
+  lg: 'w-20 h-[114px] rounded-lg text-base',
 };
 
 const RANK_FILE_NAME: Record<Rank, string> = {
@@ -60,7 +60,7 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
         } ${className}`}
       >
         <div
-          className="absolute inset-1 rounded-md border border-amber-400/35 opacity-80"
+          className="absolute inset-1 rounded-[4px] border border-amber-400/35 opacity-80"
           style={{
             backgroundImage:
               'repeating-linear-gradient(45deg, rgba(251,191,36,0.1) 0px, rgba(251,191,36,0.1) 3px, transparent 3px, transparent 8px)',

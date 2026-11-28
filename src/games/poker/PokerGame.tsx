@@ -277,7 +277,7 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
           </div>
 
           {/* Community Cards */}
-          <div className="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap min-h-[86px] sm:min-h-[100px]">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap min-h-[96px] sm:min-h-[112px]">
             {Array.from({ length: 5 }).map((_, idx) => {
               const card = state.community[idx];
               return card ? (
@@ -285,7 +285,7 @@ export const PokerGame: React.FC<PokerGameProps> = ({ onBack }) => {
               ) : (
                 <div
                   key={idx}
-                  className="w-12 h-[68px] sm:w-16 sm:h-[92px] rounded-xl border-2 border-dashed border-emerald-300/20 bg-black/15"
+                  className="w-16 h-[92px] sm:w-[76px] sm:h-[108px] rounded-lg border-2 border-dashed border-emerald-300/20 bg-black/15"
                 />
               );
             })}
