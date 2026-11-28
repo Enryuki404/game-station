@@ -363,6 +363,32 @@ export const LastOneCard: React.FC<{
   );
 };
 
+const LastOneEmblem: React.FC<{ className?: string }> = ({ className = 'w-9 h-9 sm:w-12 sm:h-12' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+    {/* 4-color segmented ring */}
+    <path d="M 32 6 A 26 26 0 0 0 6 32" fill="none" stroke="#f43f5e" strokeWidth="6.5" strokeLinecap="round" />
+    <path d="M 32 6 A 26 26 0 0 1 58 32" fill="none" stroke="#38bdf8" strokeWidth="6.5" strokeLinecap="round" />
+    <path d="M 6 32 A 26 26 0 0 0 32 58" fill="none" stroke="#fbbf24" strokeWidth="6.5" strokeLinecap="round" />
+    <path d="M 58 32 A 26 26 0 0 1 32 58" fill="none" stroke="#10b981" strokeWidth="6.5" strokeLinecap="round" />
+    {/* Dark core */}
+    <circle cx="32" cy="32" r="18" fill="#0f172a" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
+    {/* Minimalist crown */}
+    <path d="M23 23 L27 17 L32 21 L37 17 L41 23 Z" fill="#fbbf24" />
+    {/* Bold numeral 1 */}
+    <text
+      x="32"
+      y="43"
+      textAnchor="middle"
+      fontSize="20"
+      fontWeight="900"
+      fill="#ffffff"
+      fontFamily="system-ui, sans-serif"
+    >
+      1
+    </text>
+  </svg>
+);
+
 export const LastOneCardBack: React.FC<{
   size?: 'mini' | 'sm' | 'md';
   className?: string;
@@ -397,8 +423,7 @@ export const LastOneCardBack: React.FC<{
 
       {/* Custom LAST ONE! Original Emblem: 4-color arc ring + #1 crown/star mark */}
       <div className={`relative z-10 flex flex-col items-center justify-center ${isSm ? 'gap-0.5' : 'gap-1'}`}>
-        <svg
-          viewBox="0 0 64 64"
+        <LastOneEmblem
           className={
             isMini
               ? 'w-3.5 h-3.5 sm:w-4 sm:h-4'
@@ -406,33 +431,7 @@ export const LastOneCardBack: React.FC<{
                 ? 'w-7 h-7 drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]'
                 : 'w-9 h-9 sm:w-12 sm:h-12 drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]'
           }
-          aria-hidden="true"
-        >
-          {/* 4-color segmented ring */}
-          <path d="M 32 6 A 26 26 0 0 0 6 32" fill="none" stroke="#f43f5e" strokeWidth="6.5" strokeLinecap="round" />
-          <path d="M 32 6 A 26 26 0 0 1 58 32" fill="none" stroke="#38bdf8" strokeWidth="6.5" strokeLinecap="round" />
-          <path d="M 6 32 A 26 26 0 0 0 32 58" fill="none" stroke="#fbbf24" strokeWidth="6.5" strokeLinecap="round" />
-          <path d="M 58 32 A 26 26 0 0 1 32 58" fill="none" stroke="#10b981" strokeWidth="6.5" strokeLinecap="round" />
-          {/* Dark core */}
-          <circle cx="32" cy="32" r="18" fill="#0f172a" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
-          {/* Minimalist crown */}
-          <path
-            d="M23 23 L27 17 L32 21 L37 17 L41 23 Z"
-            fill="#fbbf24"
-          />
-          {/* Bold numeral 1 */}
-          <text
-            x="32"
-            y="43"
-            textAnchor="middle"
-            fontSize="20"
-            fontWeight="900"
-            fill="#ffffff"
-            fontFamily="system-ui, sans-serif"
-          >
-            1
-          </text>
-        </svg>
+        />
 
         {!isMini && (
           <span
@@ -561,11 +560,12 @@ export const LastOneLauncher: React.FC<{
       <div
         className={`w-[88px] sm:w-[104px] rounded-2xl border-2 border-slate-300/30 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-2 shadow-2xl flex flex-col items-center gap-2 transition-all duration-200 ${frameAnim}`}
       >
-        {/* Top Launcher Chute with peeking card back */}
-        <div className="relative w-full h-11 sm:h-12 rounded-lg bg-black/75 border border-white/10 overflow-hidden flex items-start justify-center pt-1.5 shadow-inner">
-          <div className="scale-[0.72] origin-top -mt-1 pointer-events-none">
-            <LastOneCardBack size="sm" />
-          </div>
+        {/* Top LAST ONE! Launcher faceplate */}
+        <div className="relative w-full py-2 px-1.5 rounded-xl bg-black/75 border border-white/12 overflow-hidden flex flex-col items-center justify-center gap-1 shadow-inner">
+          <LastOneEmblem className="w-8 h-8 sm:w-9 sm:h-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]" />
+          <span className="px-1.5 py-[1px] rounded-full bg-white/10 border border-white/20 text-[6.5px] sm:text-[7px] font-black tracking-wider text-white uppercase whitespace-nowrap leading-none">
+            LAST ONE
+          </span>
           <span
             aria-hidden="true"
             className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${statusLed}`}
@@ -589,7 +589,7 @@ export const LastOneLauncher: React.FC<{
               : 'bg-slate-800/80 border-slate-700 text-slate-500 cursor-not-allowed'
           }`}
         >
-          <Zap className="w-3.5 h-3.5 fill-current shrink-0" />
+          <LastOneEmblem className="w-4 h-4 shrink-0" />
           <span>{mustFire ? `TEKAN ${pendingHits}×` : canFire ? 'TEKAN!' : 'LAUNCHER'}</span>
         </button>
       </div>

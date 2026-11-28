@@ -8,14 +8,27 @@ const COLOR_LABELS = {
 
 const VALID_VARIANTS = new Set(['classic', 'stack', 'sevenzero', 'nomercy', 'allwild', 'attack']);
 
+function secureRand() {
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+    const buf = new Uint32Array(1);
+    cryptoObj.getRandomValues(buf);
+    return buf[0] / 4294967296;
+  }
+  return Math.random();
+}
+
+function randIntInclusive(min, max) {
+  return min + Math.floor(secureRand() * (max - min + 1));
+}
+
 function rollLauncherBurst() {
-  const r = Math.random();
-  if (r < 0.4) return 0;
-  if (r < 0.65) return 2;
-  if (r < 0.83) return 3;
-  if (r < 0.93) return 4;
-  if (r < 0.98) return 6;
-  return 8;
+  const r = secureRand();
+  if (r < 0.44) return 0;
+  if (r < 0.70) return randIntInclusive(1, 3);
+  if (r < 0.86) return randIntInclusive(4, 6);
+  if (r < 0.95) return randIntInclusive(7, 9);
+  return randIntInclusive(10, 12);
 }
 
 function normalizeVariant(raw) {

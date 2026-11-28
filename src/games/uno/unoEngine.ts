@@ -127,9 +127,9 @@ export const UNO_VARIANT_META: Record<UnoVariant, { label: string; shortDesc: st
   },
   attack: {
     label: 'Attack!',
-    shortDesc: 'Mesin Card Launcher! Tekan tombol launcher: bisa aman (0 kartu) atau meledak 2–8 kartu sekaligus!',
+    shortDesc: 'Mesin Card Launcher! Tekan tombol launcher: bisa aman (0 kartu) atau meledak 1–12 kartu acak!',
     rules: [
-      'Dek diganti menjadi Mesin Card Launcher! Saat menekan tombol Launcher, hasilnya acak: bisa klik AMAN (0 kartu) atau menyemburkan 2–8 kartu sekaligus!',
+      'Dek diganti menjadi Mesin Card Launcher! Saat menekan tombol Launcher, hasilnya acak: bisa klik AMAN (0 kartu) atau menyemburkan 1–12 kartu sekaligus!',
       'Hit 2 (⚡2): Pemain berikutnya wajib menekan tombol Launcher 2× berturut-turut!',
       'Wild All Hit (⚡ALL): Pilih warna — SEMUA lawan di meja otomatis ditembak Launcher 1×!',
       'Wild +4 (⚡4): Pilih warna dan pemain berikutnya wajib menekan tombol Launcher 4×! Tersedia juga Discard All.',
@@ -137,14 +137,27 @@ export const UNO_VARIANT_META: Record<UnoVariant, { label: string; shortDesc: st
   },
 };
 
+function secureRand(): number {
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+    const buf = new Uint32Array(1);
+    cryptoObj.getRandomValues(buf);
+    return buf[0] / 4294967296;
+  }
+  return Math.random();
+}
+
+function randIntInclusive(min: number, max: number): number {
+  return min + Math.floor(secureRand() * (max - min + 1));
+}
+
 export function rollLauncherBurst(): number {
-  const r = Math.random();
-  if (r < 0.4) return 0;
-  if (r < 0.65) return 2;
-  if (r < 0.83) return 3;
-  if (r < 0.93) return 4;
-  if (r < 0.98) return 6;
-  return 8;
+  const r = secureRand();
+  if (r < 0.44) return 0;
+  if (r < 0.70) return randIntInclusive(1, 3);
+  if (r < 0.86) return randIntInclusive(4, 6);
+  if (r < 0.95) return randIntInclusive(7, 9);
+  return randIntInclusive(10, 12);
 }
 
 export function getDrawPower(value: UnoValue): number {
