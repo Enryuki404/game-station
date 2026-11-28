@@ -232,6 +232,66 @@ const RING_COLORS: Record<UnoColor | 'allwild', { stroke: string; glow: string }
   allwild: { stroke: '#c084fc', glow: 'rgba(168, 85, 247, 0.55)' },
 };
 
+export const TableFeltWatermark: React.FC = () => (
+  <div
+    aria-hidden="true"
+    className="pointer-events-none select-none absolute inset-0 flex items-center justify-center"
+  >
+    <svg
+      viewBox="0 0 260 260"
+      className="w-56 h-56 sm:w-72 sm:h-72 md:w-80 md:h-80 text-white opacity-[0.09]"
+    >
+      {/* Double silk-screened felt perimeter rings */}
+      <circle cx="130" cy="130" r="122" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.7" />
+      <circle
+        cx="130"
+        cy="130"
+        r="112"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1"
+        strokeDasharray="6 6"
+        opacity="0.5"
+      />
+
+      {/* 4-segmented rounded emblem ring */}
+      <path d="M 65 109 A 66 66 0 0 1 119 55" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
+      <path d="M 141 55 A 66 66 0 0 1 195 109" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
+      <path d="M 195 131 A 66 66 0 0 1 141 185" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
+      <path d="M 119 185 A 66 66 0 0 1 65 131" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
+
+      {/* Inner emblem circle, crown & #1 */}
+      <circle cx="130" cy="120" r="46" fill="none" stroke="currentColor" strokeWidth="2.2" opacity="0.7" />
+      <path d="M 108 98 L 117 84 L 130 93 L 143 84 L 152 98 Z" fill="currentColor" />
+      <text
+        x="130"
+        y="150"
+        textAnchor="middle"
+        fontSize="52"
+        fontWeight="900"
+        fill="currentColor"
+        fontFamily="system-ui, sans-serif"
+      >
+        1
+      </text>
+
+      {/* Tracked LAST ONE felt wordmark */}
+      <text
+        x="130"
+        y="218"
+        textAnchor="middle"
+        fontSize="15"
+        fontWeight="900"
+        letterSpacing="5"
+        fill="currentColor"
+        fontFamily="system-ui, sans-serif"
+      >
+        LAST ONE
+      </text>
+    </svg>
+  </div>
+);
+
 export const DirectionGlowRing: React.FC<{
   activeColor: UnoColor;
   direction: 1 | -1;

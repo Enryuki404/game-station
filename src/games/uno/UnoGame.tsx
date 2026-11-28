@@ -32,6 +32,7 @@ import {
   MoveHistoryChat,
   OpponentSeat,
   SeatAvatar,
+  TableFeltWatermark,
   type MoveLogEntry,
   type TableOpponent,
 } from './UnoTableParts';
@@ -740,6 +741,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
             </div>
 
             <div className="relative flex flex-col items-center justify-center py-6 sm:py-8">
+              <TableFeltWatermark />
               <DirectionGlowRing
                 activeColor={activeColor}
                 direction={direction}
