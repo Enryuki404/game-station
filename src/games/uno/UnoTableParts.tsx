@@ -1,5 +1,4 @@
 import React from 'react';
-import type { UnoColor } from './unoEngine';
 import { LastOneCardBack } from './LastOneCard';
 
 const AVATAR_THEMES = [
@@ -224,14 +223,6 @@ export const OpponentSeat: React.FC<{
   );
 };
 
-const RING_COLORS: Record<UnoColor | 'allwild', { stroke: string; glow: string }> = {
-  red: { stroke: '#fb7185', glow: 'rgba(244, 63, 94, 0.55)' },
-  blue: { stroke: '#38bdf8', glow: 'rgba(14, 165, 233, 0.55)' },
-  green: { stroke: '#4ade80', glow: 'rgba(34, 197, 94, 0.55)' },
-  yellow: { stroke: '#fde047', glow: 'rgba(250, 204, 21, 0.55)' },
-  allwild: { stroke: '#c084fc', glow: 'rgba(168, 85, 247, 0.55)' },
-};
-
 export const TableFeltWatermark: React.FC = () => (
   <div
     aria-hidden="true"
@@ -239,19 +230,19 @@ export const TableFeltWatermark: React.FC = () => (
   >
     <svg
       viewBox="0 0 260 260"
-      className="w-56 h-56 sm:w-72 sm:h-72 md:w-80 md:h-80 text-white opacity-[0.09]"
+      className="w-56 h-56 sm:w-72 sm:h-72 md:w-80 md:h-80 text-white opacity-[0.24] drop-shadow-[0_2px_6px_rgba(0,0,0,0.28)]"
     >
       {/* Double silk-screened felt perimeter rings */}
-      <circle cx="130" cy="130" r="122" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.7" />
+      <circle cx="130" cy="130" r="122" fill="none" stroke="currentColor" strokeWidth="2.2" opacity="0.75" />
       <circle
         cx="130"
         cy="130"
         r="112"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1"
+        strokeWidth="1.4"
         strokeDasharray="6 6"
-        opacity="0.5"
+        opacity="0.55"
       />
 
       {/* 4-segmented rounded emblem ring */}
@@ -261,7 +252,7 @@ export const TableFeltWatermark: React.FC = () => (
       <path d="M 119 185 A 66 66 0 0 1 65 131" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
 
       {/* Inner emblem circle, crown & #1 */}
-      <circle cx="130" cy="120" r="46" fill="none" stroke="currentColor" strokeWidth="2.2" opacity="0.7" />
+      <circle cx="130" cy="120" r="46" fill="none" stroke="currentColor" strokeWidth="2.6" opacity="0.75" />
       <path d="M 108 98 L 117 84 L 130 93 L 143 84 L 152 98 Z" fill="currentColor" />
       <text
         x="130"
@@ -291,67 +282,6 @@ export const TableFeltWatermark: React.FC = () => (
     </svg>
   </div>
 );
-
-export const DirectionGlowRing: React.FC<{
-  activeColor: UnoColor;
-  direction: 1 | -1;
-  isAllWild?: boolean;
-}> = ({ activeColor, direction, isAllWild = false }) => {
-  const palette = RING_COLORS[isAllWild ? 'allwild' : activeColor];
-
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-45"
-    >
-      <svg
-        viewBox="0 0 560 280"
-        className={`w-[320px] sm:w-[440px] md:w-[500px] h-auto transition-transform duration-500 ${
-          direction === -1 ? '-scale-x-100' : 'scale-x-100'
-        }`}
-        style={{ filter: `drop-shadow(0 0 14px ${palette.glow})` }}
-      >
-        {/* Top clockwise sweeping arc */}
-        <path
-          d="M 92 96 C 165 16, 380 16, 452 76"
-          fill="none"
-          stroke={palette.stroke}
-          strokeWidth="16"
-          strokeLinecap="round"
-          opacity="0.22"
-        />
-        <path
-          d="M 92 96 C 165 16, 380 16, 452 76"
-          fill="none"
-          stroke={palette.stroke}
-          strokeWidth="5"
-          strokeLinecap="round"
-          opacity="0.82"
-        />
-        <path d="M 446 56 L 482 92 L 436 86 Z" fill={palette.stroke} opacity="0.88" />
-
-        {/* Bottom clockwise sweeping arc */}
-        <path
-          d="M 468 184 C 395 264, 180 264, 108 204"
-          fill="none"
-          stroke={palette.stroke}
-          strokeWidth="16"
-          strokeLinecap="round"
-          opacity="0.22"
-        />
-        <path
-          d="M 468 184 C 395 264, 180 264, 108 204"
-          fill="none"
-          stroke={palette.stroke}
-          strokeWidth="5"
-          strokeLinecap="round"
-          opacity="0.82"
-        />
-        <path d="M 114 224 L 78 188 L 124 194 Z" fill={palette.stroke} opacity="0.88" />
-      </svg>
-    </div>
-  );
-};
 
 export interface MoveLogEntry {
   id: number;

@@ -28,7 +28,6 @@ import {
 } from './unoEngine';
 import { LastOneCard, LastOneDrawDeck } from './LastOneCard';
 import {
-  DirectionGlowRing,
   MoveHistoryChat,
   OpponentSeat,
   SeatAvatar,
@@ -742,11 +741,6 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
 
             <div className="relative flex flex-col items-center justify-center py-6 sm:py-8">
               <TableFeltWatermark />
-              <DirectionGlowRing
-                activeColor={activeColor}
-                direction={direction}
-                isAllWild={activeVariant === 'allwild'}
-              />
 
               <div className="relative z-10 flex items-center justify-center gap-6 sm:gap-10">
                 <LastOneDrawDeck
