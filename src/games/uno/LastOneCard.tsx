@@ -62,6 +62,31 @@ const SkipAllIcon: React.FC<{ className?: string }> = ({ className = 'w-7 h-7 sm
   </svg>
 );
 
+const ReverseIcon: React.FC<{ className?: string }> = ({ className = 'w-7 h-7 sm:w-9 sm:h-9' }) => (
+  <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+    <g transform="rotate(-45 24 24)">
+      {/* Top arrow pointing up-right after rotation */}
+      <path
+        d="M 9.5 22 Q 10.5 16.5 17 16.5 L 28.5 16.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="4.6"
+        strokeLinecap="round"
+      />
+      <path d="M 27 10 L 38.5 16.5 L 27 23 Z" fill="currentColor" />
+      {/* Bottom arrow pointing down-left after rotation (180° symmetric) */}
+      <path
+        d="M 38.5 26 Q 37.5 31.5 31 31.5 L 19.5 31.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="4.6"
+        strokeLinecap="round"
+      />
+      <path d="M 21 38 L 9.5 31.5 L 21 25 Z" fill="currentColor" />
+    </g>
+  </svg>
+);
+
 const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
   const isYellow = card.color === 'yellow';
   const strokeMain = isYellow ? '#0f172a' : '#ffffff';
@@ -96,26 +121,9 @@ const CenterGraphic: React.FC<{ card: UnoCard }> = ({ card }) => {
 
   if (card.value === 'reverse') {
     return (
-      <svg viewBox="0 0 48 48" className="w-6 h-6 sm:w-8 sm:h-8 drop-shadow-md" aria-hidden="true">
-        <path
-          d="M15 20 C15 13 24 11 30 14 L27 10 M30 14 L25 18"
-          fill="none"
-          stroke={strokeMain}
-          strokeWidth="3.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M33 28 C33 35 24 37 18 34 L21 38 M18 34 L23 30"
-          fill="none"
-          stroke={strokeMain}
-          strokeWidth="3.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path d="M12 22 L32 13 L30 22 Z" fill={strokeMain} opacity="0.92" />
-        <path d="M36 26 L16 35 L18 26 Z" fill={strokeMain} opacity="0.92" />
-      </svg>
+      <ReverseIcon
+        className={`w-7 h-7 sm:w-9 sm:h-9 drop-shadow-md ${isYellow ? 'text-slate-950' : 'text-white'}`}
+      />
     );
   }
 
@@ -252,6 +260,15 @@ export const LastOneCard: React.FC<{
         : 'w-16 h-[92px] sm:w-[76px] sm:h-[108px] p-1.5 rounded-lg border-2';
 
   const cornerCls = size === 'xs' ? 'text-[9px]' : 'text-[10px] sm:text-[11px]';
+  const cornerIconCls = size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3 sm:w-3.5 sm:h-3.5';
+  const cornerContent =
+    card.value === 'skipAll' ? (
+      <SkipAllIcon className={cornerIconCls} />
+    ) : card.value === 'reverse' ? (
+      <ReverseIcon className={cornerIconCls} />
+    ) : (
+      <span>{corner}</span>
+    );
 
   const sharedClasses = `${dim} relative border-white/95 bg-gradient-to-br ${palette.grad} ${palette.corner} shadow-xl flex flex-col justify-between select-none overflow-hidden transition-all duration-200 ease-out ${
     onClick
@@ -271,11 +288,7 @@ export const LastOneCard: React.FC<{
 
       {/* Top-left index */}
       <span className={`relative z-10 self-start inline-flex flex-col items-center w-fit ${cornerCls} font-black leading-none tracking-tight`}>
-        {card.value === 'skipAll' ? (
-          <SkipAllIcon className={size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3 sm:w-3.5 sm:h-3.5'} />
-        ) : (
-          <span>{corner}</span>
-        )}
+        {cornerContent}
         {needsUnderline && <span className="w-2 h-[1.5px] bg-current mt-[1px]" />}
       </span>
 
@@ -288,11 +301,7 @@ export const LastOneCard: React.FC<{
 
       {/* Bottom-right inverted index */}
       <span className={`relative z-10 self-end inline-flex flex-col items-center w-fit rotate-180 ${cornerCls} font-black leading-none tracking-tight`}>
-        {card.value === 'skipAll' ? (
-          <SkipAllIcon className={size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3 sm:w-3.5 sm:h-3.5'} />
-        ) : (
-          <span>{corner}</span>
-        )}
+        {cornerContent}
         {needsUnderline && <span className="w-2 h-[1.5px] bg-current mt-[1px]" />}
       </span>
     </>
