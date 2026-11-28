@@ -22,13 +22,34 @@ function randIntInclusive(min, max) {
   return min + Math.floor(secureRand() * (max - min + 1));
 }
 
-function rollLauncherBurst() {
+function rollLauncherFuse() {
   const r = secureRand();
-  if (r < 0.44) return 0;
-  if (r < 0.70) return randIntInclusive(1, 3);
-  if (r < 0.86) return randIntInclusive(4, 6);
-  if (r < 0.95) return randIntInclusive(7, 9);
-  return randIntInclusive(10, 12);
+  if (r < 0.25) return randIntInclusive(1, 3);
+  if (r < 0.65) return randIntInclusive(4, 7);
+  if (r < 0.90) return randIntInclusive(8, 11);
+  return randIntInclusive(12, 15);
+}
+
+function rollLauncherBurst(streakPresses = 1) {
+  if (streakPresses <= 3) return randIntInclusive(1, 4);
+  if (streakPresses <= 7) return randIntInclusive(2, 7);
+  return randIntInclusive(4, 10);
+}
+
+function triggerLauncherPress(u) {
+  u.launcherFuse ??= rollLauncherFuse();
+  u.launcherStreak ??= 0;
+  u.launcherFuse -= 1;
+  u.launcherStreak += 1;
+
+  if (u.launcherFuse > 0) {
+    return 0;
+  }
+
+  const burst = rollLauncherBurst(u.launcherStreak);
+  u.launcherStreak = 0;
+  u.launcherFuse = rollLauncherFuse();
+  return burst;
 }
 
 function normalizeVariant(raw) {
@@ -288,6 +309,8 @@ export function startUnoMatch(room, fillBots, variantRaw = 'classic') {
     winnerIndex: null,
     lastBurst: null,
     lastLauncherEvent: null,
+    launcherFuse: variant === 'attack' ? rollLauncherFuse() : undefined,
+    launcherStreak: 0,
     statusText: `Permainan dimulai! Giliran ${players[0].name}.`,
   };
 }
@@ -412,7 +435,7 @@ export function applyUnoPlay(room, actorId, cardId, chosenColor, swapTargetId) {
     let totalShot = 0;
     for (let idx = 0; idx < u.players.length; idx++) {
       if (idx === actorIdx || u.players[idx].eliminated) continue;
-      const burst = rollLauncherBurst();
+      const burst = triggerLauncherPress(u);
       if (burst > 0) {
         const res = drawFromPile(u.drawPile, u.discardPile, burst);
         u.players[idx].hand.push(...res.drawn);
@@ -481,7 +504,7 @@ export function applyUnoDraw(room, actorId) {
   if (!actor || actor.id !== actorId || actor.eliminated) return false;
 
   if (u.variant === 'attack') {
-    const burst = rollLauncherBurst();
+    const burst = triggerLauncherPress(u);
     let pulled = 0;
     if (burst > 0) {
       const res = drawFromPile(u.drawPile, u.discardPile, burst);
@@ -644,6 +667,7 @@ export function getSanitizedUnoState(room, viewerId) {
     winnerIndex: u.winnerIndex,
     lastBurst: u.lastBurst,
     lastLauncherEvent: u.lastLauncherEvent ?? null,
+    launcherStreak: u.launcherStreak ?? 0,
     statusText: u.statusText,
   };
 }

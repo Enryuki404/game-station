@@ -67,6 +67,7 @@ interface OnlineUnoState {
   winnerIndex: number | null;
   lastBurst: { id: number; text: string } | null;
   lastLauncherEvent?: { id: number; cards: number; actorName: string } | null;
+  launcherStreak?: number;
   statusText: string;
 }
 
@@ -307,6 +308,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
   const activeWildCard = isOnlinePlaying ? onlineWildCard : pendingWildCard;
   const activeSwapCard = isOnlinePlaying ? onlineSwapCard : pendingSwapCard;
   const lastLauncherEvent = isOnlinePlaying ? (onlineUno!.lastLauncherEvent ?? null) : (match.lastLauncherEvent ?? null);
+  const launcherStreak = isOnlinePlaying ? (onlineUno!.launcherStreak ?? 0) : (match.launcherStreak ?? 0);
 
   useEffect(() => {
     if (!lastLauncherEvent) return;
@@ -451,16 +453,58 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
     rightSeat = orderedOpponents[orderedOpponents.length - 1];
   }
 
-  const fanOverlapClass =
-    myHand.length <= 5
+  const useTwoHandRows = myHand.length > 13;
+  const splitIdx = useTwoHandRows ? Math.ceil(myHand.length / 2) : myHand.length;
+  const handRows = useTwoHandRows ? [myHand.slice(0, splitIdx), myHand.slice(splitIdx)] : [myHand];
+
+  const getRowOverlapClass = (len: number) =>
+    len <= 5
       ? '-ml-1.5 sm:-ml-2'
-      : myHand.length <= 8
+      : len <= 8
         ? '-ml-3.5 sm:-ml-4'
-        : myHand.length <= 12
+        : len <= 12
           ? '-ml-6 sm:-ml-7'
           : '-ml-8 sm:-ml-10';
-  const fanMid = (myHand.length - 1) / 2;
-  const fanStepDeg = myHand.length <= 7 ? 2.4 : myHand.length <= 12 ? 1.6 : 1.0;
+
+  const renderHandRow = (cards: UnoCard[], isBackRow = false) => {
+    const rowMid = (cards.length - 1) / 2;
+    const rowStepDeg = cards.length <= 7 ? 2.4 : cards.length <= 12 ? 1.5 : 1.0;
+    const overlapCls = getRowOverlapClass(cards.length);
+    return (
+      <div className="flex items-end justify-center mx-auto w-max">
+        {cards.map((card, i) => {
+          const playable =
+            isHumanTurn && isCardPlayable(card, topCard, activeColor, pendingDraw, pendingDrawMin, activeVariant);
+          const offset = i - rowMid;
+          const angle = cards.length > 1 ? offset * rowStepDeg : 0;
+          const archY = Math.min(8, Math.abs(offset) * (cards.length > 10 ? 0.85 : 1.4));
+          return (
+            <div
+              key={card.id}
+              style={{ transform: `rotate(${angle}deg) translateY(${archY}px)` }}
+              className={`relative transition-transform duration-200 hover:z-50 ${
+                i === 0 ? '' : overlapCls
+              } ${
+                playable
+                  ? isBackRow
+                    ? 'z-30 -translate-y-2'
+                    : 'z-40 -translate-y-2.5'
+                  : isBackRow
+                    ? 'z-10'
+                    : 'z-20'
+              }`}
+            >
+              <LastOneCard
+                card={card}
+                playable={playable}
+                onClick={() => handleCardClick(card)}
+              />
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <GameShell
@@ -759,6 +803,7 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
                     canFire={isHumanTurn}
                     hasPlayableCard={hasPlayableCard}
                     pendingHits={pendingDraw}
+                    streakCount={launcherStreak}
                     launcherEvent={lastLauncherEvent}
                     onFire={handleDrawClick}
                   />
@@ -808,32 +853,16 @@ export const UnoGame: React.FC<UnoGameProps> = ({ onBack, initialRoomCode, initi
 
           {/* Bottom Player Hand & Corner Controls */}
           <div className="relative z-20 pt-1">
-            {/* Fanned Human Hand */}
-            <div className="w-full overflow-x-auto no-scrollbar pt-7 pb-2 px-4 sm:px-6 md:px-28">
-              <div className="flex items-end justify-center mx-auto w-max">
-                {myHand.map((card, i) => {
-                  const playable =
-                    isHumanTurn && isCardPlayable(card, topCard, activeColor, pendingDraw, pendingDrawMin, activeVariant);
-                  const offset = i - fanMid;
-                  const angle = myHand.length > 1 ? offset * fanStepDeg : 0;
-                  const archY = Math.abs(offset) * (myHand.length > 10 ? 0.9 : 1.5);
-                  return (
-                    <div
-                      key={card.id}
-                      style={{ transform: `rotate(${angle}deg) translateY(${archY}px)` }}
-                      className={`relative transition-transform duration-200 hover:z-40 ${
-                        i === 0 ? '' : fanOverlapClass
-                      } ${playable ? 'z-20 -translate-y-2.5' : 'z-10'}`}
-                    >
-                      <LastOneCard
-                        card={card}
-                        playable={playable}
-                        onClick={() => handleCardClick(card)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Fanned Human Hand (auto-splits into 2 clean tiered rows inside safe bounds when > 13 cards) */}
+            <div className="overflow-x-auto no-scrollbar pt-7 pb-4 px-4 sm:px-6 md:mx-36">
+              {useTwoHandRows ? (
+                <div className="flex flex-col items-center mx-auto w-max">
+                  <div className="-mb-8 sm:-mb-10">{renderHandRow(handRows[0], true)}</div>
+                  <div>{renderHandRow(handRows[1], false)}</div>
+                </div>
+              ) : (
+                renderHandRow(handRows[0], false)
+              )}
             </div>
 
             {/* Bottom-Left Player Avatar + Bottom-Right LAST ONE Button */}

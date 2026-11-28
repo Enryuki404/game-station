@@ -520,11 +520,20 @@ export const LastOneLauncher: React.FC<{
   canFire: boolean;
   hasPlayableCard: boolean;
   pendingHits?: number;
+  streakCount?: number;
   launcherEvent?: { id: number; cards: number; actorName: string } | null;
   onFire: () => void;
-}> = ({ canFire, hasPlayableCard, pendingHits = 0, launcherEvent, onFire }) => {
+}> = ({ canFire, hasPlayableCard, pendingHits = 0, streakCount = 0, launcherEvent, onFire }) => {
   const [flashState, setFlashState] = useState<'idle' | 'safe' | 'fire'>('idle');
   const mustFire = canFire && pendingHits > 0;
+  const pillCls =
+    streakCount >= 8
+      ? 'bg-rose-500/25 border-rose-400/60 text-rose-200 animate-pulse'
+      : streakCount >= 5
+        ? 'bg-amber-400/20 border-amber-300/50 text-amber-200'
+        : streakCount > 0
+          ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200'
+          : 'bg-white/10 border-white/20 text-white';
 
   useEffect(() => {
     if (!launcherEvent) return;
@@ -563,8 +572,8 @@ export const LastOneLauncher: React.FC<{
         {/* Top LAST ONE! Launcher faceplate */}
         <div className="relative w-full py-2 px-1.5 rounded-xl bg-black/75 border border-white/12 overflow-hidden flex flex-col items-center justify-center gap-1 shadow-inner">
           <LastOneEmblem className="w-8 h-8 sm:w-9 sm:h-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]" />
-          <span className="px-1.5 py-[1px] rounded-full bg-white/10 border border-white/20 text-[6.5px] sm:text-[7px] font-black tracking-wider text-white uppercase whitespace-nowrap leading-none">
-            LAST ONE
+          <span className={`px-1.5 py-[1px] rounded-full border text-[6.5px] sm:text-[7px] font-black tracking-wider uppercase whitespace-nowrap leading-none ${pillCls}`}>
+            {streakCount > 0 ? `${streakCount}× AMAN` : 'LAST ONE'}
           </span>
           <span
             aria-hidden="true"

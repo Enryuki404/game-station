@@ -67,6 +67,8 @@ export interface SharedUnoMatch {
   winnerIndex: number | null;
   lastBurst: { id: number; text: string } | null;
   lastLauncherEvent?: { id: number; cards: number; actorName: string } | null;
+  launcherFuse?: number;
+  launcherStreak?: number;
   statusText: string;
 }
 
@@ -127,9 +129,9 @@ export const UNO_VARIANT_META: Record<UnoVariant, { label: string; shortDesc: st
   },
   attack: {
     label: 'Attack!',
-    shortDesc: 'Mesin Card Launcher! Tekan tombol launcher: bisa aman (0 kartu) atau meledak 1–12 kartu acak!',
+    shortDesc: 'Mesin Card Launcher! Bisa aman berkali-kali hingga 8–15× tekan sebelum tiba-tiba meledak 1–10 kartu!',
     rules: [
-      'Dek diganti menjadi Mesin Card Launcher! Saat menekan tombol Launcher, hasilnya acak: bisa klik AMAN (0 kartu) atau menyemburkan 1–12 kartu sekaligus!',
+      'Dek diganti menjadi Mesin Card Launcher ber-sekring rahasia! Setiap klik bisa aman (0 kartu) sampai 8–15× tekan berturut-turut sebelum akhirnya meledak menyemburkan 1–10 kartu!',
       'Hit 2 (⚡2): Pemain berikutnya wajib menekan tombol Launcher 2× berturut-turut!',
       'Wild All Hit (⚡ALL): Pilih warna — SEMUA lawan di meja otomatis ditembak Launcher 1×!',
       'Wild +4 (⚡4): Pilih warna dan pemain berikutnya wajib menekan tombol Launcher 4×! Tersedia juga Discard All.',
@@ -151,13 +153,34 @@ function randIntInclusive(min: number, max: number): number {
   return min + Math.floor(secureRand() * (max - min + 1));
 }
 
-export function rollLauncherBurst(): number {
+export function rollLauncherFuse(): number {
   const r = secureRand();
-  if (r < 0.44) return 0;
-  if (r < 0.70) return randIntInclusive(1, 3);
-  if (r < 0.86) return randIntInclusive(4, 6);
-  if (r < 0.95) return randIntInclusive(7, 9);
-  return randIntInclusive(10, 12);
+  if (r < 0.25) return randIntInclusive(1, 3);
+  if (r < 0.65) return randIntInclusive(4, 7);
+  if (r < 0.90) return randIntInclusive(8, 11);
+  return randIntInclusive(12, 15);
+}
+
+export function rollLauncherBurst(streakPresses = 1): number {
+  if (streakPresses <= 3) return randIntInclusive(1, 4);
+  if (streakPresses <= 7) return randIntInclusive(2, 7);
+  return randIntInclusive(4, 10);
+}
+
+function triggerLauncherPress(match: SharedUnoMatch): number {
+  match.launcherFuse ??= rollLauncherFuse();
+  match.launcherStreak ??= 0;
+  match.launcherFuse -= 1;
+  match.launcherStreak += 1;
+
+  if (match.launcherFuse > 0) {
+    return 0;
+  }
+
+  const burst = rollLauncherBurst(match.launcherStreak);
+  match.launcherStreak = 0;
+  match.launcherFuse = rollLauncherFuse();
+  return burst;
 }
 
 export function getDrawPower(value: UnoValue): number {
@@ -448,6 +471,8 @@ export function createSharedUnoMatch(
     winnerIndex: null,
     lastBurst: null,
     lastLauncherEvent: null,
+    launcherFuse: variant === 'attack' ? rollLauncherFuse() : undefined,
+    launcherStreak: 0,
     statusText: `Mode ${UNO_VARIANT_META[variant].label} dimulai! Giliran ${players[0].name}.`,
   };
 }
@@ -590,7 +615,7 @@ export function applySharedUnoPlay(
     let totalShot = 0;
     for (let idx = 0; idx < match.players.length; idx++) {
       if (idx === actorIdx || match.players[idx].eliminated) continue;
-      const burst = rollLauncherBurst();
+      const burst = triggerLauncherPress(match);
       if (burst > 0) {
         const res = drawFromMatchPile(match.drawPile, match.discardPile, burst);
         match.players[idx].hand.push(...res.drawn);
@@ -660,9 +685,9 @@ export function applySharedUnoDraw(match: SharedUnoMatch, actorId: string): bool
   const actor = match.players[actorIdx];
   if (!actor || actor.id !== actorId || actor.eliminated) return false;
 
-  // Attack! Mode: trigger Card Launcher (0 safe click or 2-8 card burst)
+  // Attack! Mode: trigger Card Launcher (hidden fuse: 1-15 presses before exploding 1-10 cards)
   if (match.variant === 'attack') {
-    const burst = rollLauncherBurst();
+    const burst = triggerLauncherPress(match);
     let pulled = 0;
     if (burst > 0) {
       const res = drawFromMatchPile(match.drawPile, match.discardPile, burst);
@@ -800,6 +825,7 @@ export function getSanitizedSharedUnoState(match: SharedUnoMatch, viewerId: stri
     winnerIndex: match.winnerIndex,
     lastBurst: match.lastBurst,
     lastLauncherEvent: match.lastLauncherEvent ?? null,
+    launcherStreak: match.launcherStreak ?? 0,
     statusText: match.statusText,
   };
 }
